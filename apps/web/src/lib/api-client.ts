@@ -42,7 +42,11 @@ export class ApiError extends Error {
 
 function csrfTokenFromCookie(): string | null {
   if (typeof document === "undefined") return null;
-  const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
+  // Prefer the namespaced cookie; fall back to the legacy name for
+  // compatibility with sessions opened before the rename.
+  const match =
+    document.cookie.match(/(?:^|;\s*)ARS-XSRF-TOKEN=([^;]+)/) ??
+    document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : null;
 }
 

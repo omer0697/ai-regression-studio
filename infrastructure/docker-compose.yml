@@ -23,7 +23,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-ars}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ars}
     ports:
-      - "5432:5432"
+      # Host port is configurable so the stack can coexist with other local
+      # projects (set POSTGRES_HOST_PORT in .env when 5432 is taken).
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -40,8 +42,8 @@ services:
       # Evidence bucket (screenshots/traces/PDFs — used from Phase 2 on).
       MINIO_DEFAULT_BUCKETS: ars-artifacts
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio-data:/bitnami/minio/data
     healthcheck:

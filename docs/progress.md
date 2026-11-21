@@ -82,6 +82,12 @@ komut çıktılarıyla desteklenir; doğrulanmamış hiçbir şey "tamamlandı" 
 9. Mock'lu ID sorunu (`anyLong` vs null) → save stub'ı gerçek ID atar hale getirildi.
 10. MinIO Hub imajı kaldırılmış → Bitnami legacy aynası + bucket otomatik kurulum.
 11. PowerShell 5.1 curl JSON kaçışması → duman testinde dosyadan gövde (`-d @file`).
+12. **localhost cookie çakışması:** Çerezler porta göre ayrılmadığı için aynı makinedeki
+    diğer localhost uygulamaları varsayılan `XSRF-TOKEN` adlı CSRF çerezini ezebiliyordu
+    (gerçek oturumda giriş 403 verdi). Çerezler isim alanına taşındı:
+    `ARS-XSRF-TOKEN` + `ARS-SESSIONID`; web istemcisi yeni adı okur (eski ad yedek olarak),
+    entegrasyon testi güncellendi. Ayrıca derleme sırasında çalışan konteynerin jar kilidi
+    tespit edildi → yeniden derleme öncesi konteyner durdurulmalı (Windows dosya kilidi).
 
 ### Yol Ayrımı Kararları
 

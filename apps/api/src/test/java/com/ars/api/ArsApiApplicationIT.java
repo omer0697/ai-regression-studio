@@ -67,7 +67,7 @@ class ArsApiApplicationIT {
         ResponseEntity<String> me = exchange(HttpMethod.GET, "/api/auth/me", null, null);
         assertThat(me.getStatusCode().value()).isEqualTo(200);
         assertThat(objectMapper.readTree(me.getBody()).path("user").isNull()).isTrue();
-        assertThat(cookies).containsKey("XSRF-TOKEN");
+        assertThat(cookies).containsKey("ARS-XSRF-TOKEN");
 
         // 3. Login without the CSRF header is rejected.
         ResponseEntity<String> csrflessLogin = exchange(HttpMethod.POST, "/api/auth/login",
@@ -200,11 +200,11 @@ class ArsApiApplicationIT {
             });
             httpHeaders.set(HttpHeaders.COOKIE, cookieHeader.toString());
         }
-        String csrf = csrfOverride == null ? cookies.get("XSRF-TOKEN") : csrfOverride;
+        String csrf = csrfOverride == null ? cookies.get("ARS-XSRF-TOKEN") : csrfOverride;
         if (csrf != null && !"__skip_csrf__".equals(csrf)) {
             httpHeaders.set("X-XSRF-TOKEN", csrf);
-        } else if (csrf == null && cookies.containsKey("XSRF-TOKEN")) {
-            httpHeaders.set("X-XSRF-TOKEN", cookies.get("XSRF-TOKEN"));
+        } else if (csrf == null && cookies.containsKey("ARS-XSRF-TOKEN")) {
+            httpHeaders.set("X-XSRF-TOKEN", cookies.get("ARS-XSRF-TOKEN"));
         }
         return httpHeaders;
     }
