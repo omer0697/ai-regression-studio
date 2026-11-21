@@ -1,8 +1,9 @@
 import type { DiscoverJob } from "@ars/test-schemas";
 
-import type { BrowserLifecycle } from "./browser/lifecycle.js";
 import { adapterFor } from "./adapters/index.js";
+import type { BrowserLifecycle } from "./browser/lifecycle.js";
 import type { CredentialStore } from "./credentials.js";
+import { DependencyExplorer } from "./exploration/explorer.js";
 import type { ExecutionReporter } from "./reporter.js";
 
 /** Console diagnostics collected per session (bounded). */
@@ -84,6 +85,46 @@ export class DiscoverJobRunner {
         new Uint8Array(screenshot),
       );
 
+      // ---- Phase 3: bounded safe interaction exploration -----------------
+      let executedInteractions = 0;
+      let failedInteractions = 0;
+      let observationCount = 0;
+      if ((environment.explorationMaxInteractions ?? 12) > 0) {
+        const explorer = new DependencyExplorer(
+          page,
+          {
+            maxInteractions: environment.explorationMaxInteractions ?? 12,
+            maxOptions: environment.explorationMaxOptions ?? 3,
+          },
+          timeoutMs,
+          reporter,
+          () => adapter.discoverElements(page),
+          elements,
+        );
+        const outcome = await explorer.run();
+        executedInteractions = outcome.executed;
+        failedInteractions = outcome.failed;
+        observationCount = outcome.observations.length;
+
+        if (observationCount > 0) {
+          await reporter.observations(
+            outcome.observations.map((observation) => ({
+              ...observation,
+              appType: environment.appType,
+            })),
+          );
+          await reporter.event(
+            "STEP",
+            `Recorded ${observationCount} dependency observation(s) from ${executedInteractions} interaction(s); the screen was reverted after each step.`,
+          );
+        } else {
+          await reporter.event(
+            "INFO",
+            "Exploration finished without observable dependency changes.",
+          );
+        }
+      }
+
       const tracePath = `${process.env.TEMP ?? "/tmp"}/ars-trace-${job.executionId}.zip`;
       await context.tracing.stop({ path: tracePath });
       const traceBytes = await import("node:fs/promises").then((fs) => fs.readFile(tracePath));
@@ -124,14 +165,15 @@ export class DiscoverJobRunner {
       const hiddenCount = elements.filter((element) => !element.visible).length;
       await reporter.status({
         status: "COMPLETED",
-        totalSteps: elements.length,
-        passedSteps: elements.length - hiddenCount,
+        totalSteps: elements.length + executedInteractions + failedInteractions,
+        passedSteps:
+            elements.length - hiddenCount + executedInteractions,
         skippedSteps: hiddenCount,
-        failedSteps: 0,
+        failedSteps: failedInteractions,
       });
       await reporter.event(
         "RESULT",
-        `Discovery completed: ${elements.length} elements recorded, ${hiddenCount} of them hidden.`,
+        `Discovery completed: ${elements.length} elements recorded, ${observationCount} dependency observation(s) from ${executedInteractions} safe interaction(s).`,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

@@ -207,6 +207,10 @@ export interface DiscoveredElementRecord {
   visible: boolean;
   required: boolean | null;
   options: string[] | null;
+  /** Playwright-ready CSS selector hints (id, name, aria). */
+  locatorCandidates: string[] | null;
+  /** Form group name (radios/checkboxes share it) — worker-side metadata. */
+  name: string | null;
   domPath: string | null;
   confidence: number;
 }
@@ -225,4 +229,27 @@ export interface ArtifactInfo {
   displayName: string;
   byteSize: number | null;
   createdAt: string;
+}
+
+/**
+ * A dependency observation from Phase 3 interaction exploration:
+ * "applying interaction X on source changed attribute A of affected element
+ * from before to after; the screen was reverted afterwards".
+ */
+export interface DependencyObservation {
+  id: number;
+  executionId: number;
+  appType: string;
+  screenCode: string;
+  sourceRef: string;
+  sourceLabel: string | null;
+  interaction: "selectOption" | "setCheckbox" | "chooseRadio";
+  value: string | null;
+  affectedRef: string;
+  affectedLabel: string | null;
+  attribute: "enabled" | "visible" | "value" | "options" | "required";
+  beforeValue: string | null;
+  afterValue: string | null;
+  reverted: boolean;
+  observedAt: string;
 }

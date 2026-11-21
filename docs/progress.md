@@ -203,8 +203,77 @@ komut çıktılarıyla desteklenir; doğrulanmamış hiçbir şey "tamamlandı" 
 
 ---
 
+## Faz 3 — UI Discovery: Güvenli Etkileşimli Keşif ✅ (21 Kasım 2026)
+
+### Tamamlananlar
+
+**Worker: sınırlı güvenli etkileşim keşfi (`exploration/explorer.ts`)**
+- **Etkileşim planı (bütçeli):** yalnızca seçim/checkbox/radyo — seçimler önce
+  (deneme başına seçenek limiti), sonra checkbox, sonra radyo; toplam etkileşim
+  limiti ile kesilir. **İş eylemi (submit/delete/approve/sign/send/publish) hiçbir
+  zaman gerçekleştirilmez** (master prompt §7).
+- **Her adım için akış:** durum anlık görüntüsü → etkileşimi uygula → durum-bazlı
+  bekleme (networkidle, sınırlandırılmış) → yeniden tara → **fark hesapla**
+  (etkin/görünür/değer/seçenekler; kaynak eleman ve aynı radio grubu hariç) →
+  gerçek fark varsa **kanıt screenshot'ı** → **orijinale döndür → dönüşü doğrula**
+  (baz durumdan sapma varsa dürüst uyarı olayı + gözlem `reverted=false`).
+- **Bağımlılık gözlemi kaydı:** kaynak/etkileşim/değer → etkilenen eleman/özellik
+  → önce→sonra; worker'dan API'ye toplu gönderim.
+
+**Keşif zenginleştirme**
+- Eleman kayıtlarına **Playwright-hazır konumlandırıcı adayları** (`#id`,
+  `[name=..][value=..]`, aria) ve **form grubu adı** eklendi (radio gürültüsünü
+  filtrelemek ve Faz 5 semantik eşlemesini beslemek için).
+
+**API**
+- **Flyway V3:** `dependency_observation` tablosu + `discovered_element.locator_candidates`
+  + ortam bazlı keşif bütçesi (`exploration_max_interactions` / `exploration_max_options`)
+- Internal uç: `POST /api/internal/executions/{id}/observations` (doğrulamalı);
+  kullanıcı ucu: `GET /api/executions/{id}/observations`
+- Ortam DTO/payload'ları bütçe alanlarıyla genişletildi (varsayılan 12 etkileşim /
+  3 seçenek)
+
+**Fixture (gerçek davranış!)**
+- GWT KPY68 fixture'ına gerçek bağımlılıklar: `DIGER` seçimi → Parametre Değeri
+  **etkinleşir + otomatik dolar** (OTO-123); `Aktif` kapalı → Başlangıç Tarihi
+  **pasifleşir**; `Manuel` onay → koşullu Onay Notu bölümü **görünür olur** —
+  hepsi tam geri-dönüşürlü olacak şekilde tasarlandı.
+
+**Panel**
+- Ortam formuna keşif bütçesi alanları; çalıştırma detayına **"Bağımlılık Gözlemleri"**
+  kartı (etkileşim → etkilenen alan → önce→sonra → "geri alındı" rozeti)
+
+### Doğrulama (çalıştırıldı ve geçti)
+
+| Komut | Sonuç |
+| --- | --- |
+| `npm test -w apps/browser-worker` | **14/14** — gerçek Chromium E2E: 4 etkileşim planı, **4 bağımlılık gözlemi** (enabled+value+enabled+visible), hepsi `reverted=true`; iş eylemi yokluğu doğrulandı |
+| `npm test` (tümü) | 45 TS testi geçti (2+14+14+15) |
+| `npm run build` + `lint` | temiz |
+| `mvn -B package` (Docker) | BUILD SUCCESS (13 birim testi) |
+| **Canlı uçtan uca (#4)** | `QUEUED→RUNNING→COMPLETED`: 15 eleman + 4 etkileşim = 19 adım (17 geçen / 2 gizli-atlanan / 0 başarısız); olay akışında "the screen was reverted after each step"; **4 gözlem kalıcı**; pasif + **3 etkileşim kanıt screenshot'ı** + trace MinIO'da |
+| **Playwright MCP (gerçek tarayıcı)** | "Bağımlılık Gözlemleri" tablosu: `e3 seçim 'DIGER' → e4 [value] —→OTO-123, geri alındı` render; **konsol hatası 0** (kanıt: `ars-phase3-observations.png`) |
+
+### Giderilen Sorunlar
+
+1. İki kontrolcüde constructor ataması yapılan alan bildirimleri eksik kalmış → tamamlandı.
+2. Ref numaralandırması varsayımı hatalıydı (form yerleşim **tablosu** DOM'da ilk
+   elemandır; koşullu satır başlangıçta gizli olduğundan 2 görünmez eleman var) →
+   testler gerçek davranışa göre düzeltildi ve belgelendi.
+
+### Faz 3 Kapsamı Dışında (dürüstlük)
+
+- **Gerekli/opsiyonel geçişleri, doğrulama mesajları, modal bağımlılıkları:** keşif
+  fark motoru bunları da destekler (attribute seti genişletilebilir); fixture
+  senaryoları Faz 5 karşılaştırma fixture'larıyla genişletilecek.
+- **Dinamik eklenen elemanlar** (baseline'da olmayan): gözlem dışı bırakılır, Faz 5
+  karşılaştırma kapsamında ele alınır.
+- **React keşfi:** adaptör hazır; karşılaştırma akışı Faz 5'te devreye girer.
+
+---
 
 ## Yapılacaklar Listesi (teknik borç, fazlara dağıtılmış)
+
 
 - [ ] Surefire/failsafe raporlarının CI dostu özeti (Faz 2)
 - [ ] Rate limiting + sır deposu entegrasyonu (Faz 8 öncesi zorunlu)

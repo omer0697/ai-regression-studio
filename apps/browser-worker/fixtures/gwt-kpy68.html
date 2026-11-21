@@ -37,7 +37,7 @@
     </tr>
     <tr>
       <td class="gwt-FormLabel">Parametre Değeri</td>
-      <td><input type="text" class="gwt-TextBox gwt-TextBox-Disabled" name="paramValue" value="" disabled></td>
+      <td><input type="text" class="gwt-TextBox" name="paramValue" value="" disabled></td>
     </tr>
     <tr>
       <td class="gwt-FormLabel">Açıklama</td>
@@ -57,6 +57,10 @@
         <input type="radio" class="gwt-RadioButton" name="approvalType" value="OTOMATIK" checked> Otomatik
         <input type="radio" class="gwt-RadioButton" name="approvalType" value="MANUEL"> Manuel
       </td>
+    </tr>
+    <tr id="approvalNoteRow" style="display:none">
+      <td class="gwt-FormLabel">Onay Notu (Manuel onay)</td>
+      <td><textarea class="gwt-TextArea" name="approvalNote" rows="2"></textarea></td>
     </tr>
     <tr>
       <td class="gwt-FormLabel">Gizli Not (hidden field)</td>
@@ -82,5 +86,41 @@
       <tr><td>KPY-002</td><td>STANDART</td><td>XYZ-9</td><td>Pasif</td></tr>
     </tbody>
   </table>
+
+  <script>
+    // Fixture dependency behaviors (the behavior under exploration):
+    //  1. select DIGER -> Parametre Değeri becomes enabled and auto-populates;
+    //     any other option -> disabled and cleared (fully revert-safe).
+    //  2. unchecking Aktif -> Başlangıç Tarihi becomes disabled.
+    //  3. choosing Manuel -> conditional "Onay Notu" section becomes visible.
+    var paramType = document.querySelector("select[name='paramType']");
+    var paramValue = document.querySelector("input[name='paramValue']");
+    function applyTypeDependency() {
+      if (paramType.value === "DIGER") {
+        paramValue.disabled = false;
+        if (!paramValue.value) {
+          paramValue.value = "OTO-123";
+        }
+      } else {
+        paramValue.disabled = true;
+        paramValue.value = "";
+      }
+    }
+    paramType.addEventListener("change", applyTypeDependency);
+    applyTypeDependency();
+
+    var active = document.querySelector("input[name='active']");
+    var startDate = document.querySelector("input[name='startDate']");
+    active.addEventListener("change", function () {
+      startDate.disabled = !active.checked;
+    });
+
+    var approvalRow = document.getElementById("approvalNoteRow");
+    document.querySelectorAll("input[name='approvalType']").forEach(function (radio) {
+      radio.addEventListener("change", function () {
+        approvalRow.style.display = radio.value === "MANUEL" ? "" : "none";
+      });
+    });
+  </script>
 </body>
 </html>

@@ -60,6 +60,16 @@ export const environmentFormSchema = z.object({
     .int("Zaman aşımı tam sayı (ms) olmalıdır.")
     .min(1000, "Zaman aşımı en az 1000 ms olmalıdır.")
     .max(120000, "Zaman aşımı en fazla 120000 ms olabilir."),
+  explorationMaxInteractions: z
+    .number({ message: "Etkileşim limiti sayısal olmalıdır." })
+    .int("Etkileşim limiti tam sayı olmalıdır.")
+    .min(0, "Etkileşim limiti en az 0 olmalıdır.")
+    .max(100, "Etkileşim limiti en fazla 100 olabilir."),
+  explorationMaxOptions: z
+    .number({ message: "Seçenek limiti sayısal olmalıdır." })
+    .int("Seçenek limiti tam sayı olmalıdır.")
+    .min(0, "Seçenek limiti en az 0 olmalıdır.")
+    .max(20, "Seçenek limiti en fazla 20 olabilir."),
   screenshotEnabled: z.boolean(),
 });
 export type EnvironmentFormValues = z.infer<typeof environmentFormSchema>;
@@ -92,6 +102,8 @@ export function environmentFormToPayload(values: EnvironmentFormValues): Record<
     allowedDomains: toList(values.allowedDomains),
     prohibitedActions: toList(values.prohibitedActions),
     browserTimeoutMs: values.browserTimeoutMs,
+    explorationMaxInteractions: values.explorationMaxInteractions,
+    explorationMaxOptions: values.explorationMaxOptions,
     screenshotEnabled: values.screenshotEnabled,
   };
 }

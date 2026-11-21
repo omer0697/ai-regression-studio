@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 
-import { IconAlert, IconCheck, IconPlay, IconX } from "@/components/icons";
+import { IconAlert, IconCheck, IconPlay } from "@/components/icons";
 import { PageHeader, StatCard } from "@/components/page-parts";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,7 @@ import {
   useExecution,
   useExecutionArtifacts,
   useExecutionElements,
+  useExecutionObservations,
   useStartExecution,
 } from "@/lib/api-hooks";
 import { artifactContentUrl } from "@/lib/api-client";
@@ -37,6 +38,12 @@ import {
   formatDuration,
 } from "@/lib/utils";
 import type { ExecutionEvent } from "@ars/shared-contracts";
+
+const INTERACTION_LABELS: Record<string, string> = {
+  selectOption: "seçim",
+  setCheckbox: "checkbox",
+  chooseRadio: "radyo",
+};
 
 function EventRow({ event }: { event: ExecutionEvent }) {
   const iconByType: Record<string, React.ReactNode> = {
@@ -68,6 +75,7 @@ export default function ExecutionDetailPage() {
   const { data: execution } = useExecution(executionId);
   const { data: artifacts } = useExecutionArtifacts(executionId);
   const { data: elements } = useExecutionElements(executionId);
+  const { data: observations } = useExecutionObservations(executionId);
   const stream = useExecutionStream(Number.isFinite(executionId) ? executionId : null);
 
   const startExecution = useStartExecution(execution?.projectId ?? 0);
@@ -174,6 +182,79 @@ export default function ExecutionDetailPage() {
                     <EventRow key={event.seq} event={event} />
                   ))}
                 </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Bağımlılık Gözlemleri</CardTitle>
+              <CardDescription>
+                Güvenli etkileşim keşfinin bulguları: her satırda bir etkileşimin
+                hangi alanın hangi özelliğini değiştirdiği ve ekranın ardından
+                orijinale döndürüldüğü yer alır. İş eylemi hiçbir zaman
+                gerçekleştirilmez.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {!observations || observations.length === 0 ? (
+                <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  Bu çalıştırmada bağımlılık gözlemi yok.
+                </p>
+              ) : (
+                <div className="max-h-80 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Etkileşim</TableHead>
+                        <TableHead>Etkilenen Alan</TableHead>
+                        <TableHead>Özellik</TableHead>
+                        <TableHead>Önce → Sonra</TableHead>
+                        <TableHead>Durum</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {observations.map((observation) => (
+                        <TableRow key={observation.id}>
+                          <TableCell className="max-w-56">
+                            <span className="font-mono text-xs text-primary">
+                              {observation.sourceRef}
+                            </span>{" "}
+                            <span className="text-xs text-muted-foreground">
+                              {INTERACTION_LABELS[observation.interaction] ??
+                                observation.interaction}
+                              {observation.value ? ` '${observation.value}'` : ""}
+                            </span>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {observation.sourceLabel ?? ""}
+                            </p>
+                          </TableCell>
+                          <TableCell className="max-w-48">
+                            <span className="font-mono text-xs text-primary">
+                              {observation.affectedRef}
+                            </span>{" "}
+                            <span className="text-xs">
+                              {observation.affectedLabel ?? ""}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {observation.attribute}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            <span className="text-danger">{observation.beforeValue ?? "—"}</span>
+                            <span className="mx-1 text-muted-foreground">→</span>
+                            <span className="text-success">{observation.afterValue ?? "—"}</span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge tone={observation.reverted ? "success" : "warning"}>
+                              {observation.reverted ? "geri alındı" : "geri dönüş doğrulanamadı"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>

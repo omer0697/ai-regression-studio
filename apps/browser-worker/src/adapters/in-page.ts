@@ -208,6 +208,28 @@ function inPageDiscover(strategy: "gwt" | "react"): Array<Record<string, unknown
     "input, select, textarea, button, [role='button'], a[href], table";
   const elements = Array.from(document.querySelectorAll(selector));
 
+  function locatorCandidates(el: Element): string[] {
+    const out: string[] = [];
+    if (el.id) {
+      out.push("#" + el.id);
+    }
+    const name = el.getAttribute("name");
+    if (name) {
+      const tag = el.tagName.toLowerCase();
+      const value = el.getAttribute("value");
+      if (el instanceof HTMLInputElement && el.type === "radio" && value) {
+        out.push(`${tag}[name="${name}"][value="${value}"]`);
+      } else {
+        out.push(`${tag}[name="${name}"]`);
+      }
+    }
+    const aria = el.getAttribute("aria-label");
+    if (aria) {
+      out.push(`[aria-label="${aria}"]`);
+    }
+    return out.slice(0, 3);
+  }
+
   for (const el of elements) {
     const type = el.tagName === "TABLE" ? "table" : classify(el);
     const visible = isVisible(el);
@@ -258,6 +280,8 @@ function inPageDiscover(strategy: "gwt" | "react"): Array<Record<string, unknown
       visible,
       required: requiredOf(el),
       options: optionsOf(el, type),
+      locatorCandidates: locatorCandidates(el),
+      name: el.getAttribute("name"),
       domPath: domPath(el),
       confidence: confidenceFor(el, label, type),
     });
@@ -285,6 +309,8 @@ export async function runDiscoveryInPage(
     visible: Boolean(record.visible),
     required: (record.required as boolean | null) ?? null,
     options: (record.options as string[] | null) ?? null,
+    locatorCandidates: (record.locatorCandidates as string[] | null) ?? null,
+    name: (record.name as string | null) ?? null,
     domPath: (record.domPath as string | null) ?? null,
     confidence: Number(record.confidence ?? 0),
   }));

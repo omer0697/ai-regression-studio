@@ -63,6 +63,10 @@ public class DiscoveredElement {
     @Column(name = "options", columnDefinition = "jsonb")
     private List<String> options;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "locator_candidates", columnDefinition = "jsonb")
+    private List<String> locatorCandidates;
+
     @Column(name = "dom_path", length = 600)
     private String domPath;
 
@@ -174,6 +178,15 @@ public class DiscoveredElement {
 
     public void setOptions(List<String> options) {
         this.options = options == null ? null : List.copyOf(options);
+    }
+
+    public List<String> getLocatorCandidates() {
+        return locatorCandidates;
+    }
+
+    public void setLocatorCandidates(List<String> locatorCandidates) {
+        this.locatorCandidates =
+                locatorCandidates == null ? null : List.copyOf(locatorCandidates);
     }
 
     public String getDomPath() {

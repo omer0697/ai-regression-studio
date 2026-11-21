@@ -17,6 +17,7 @@ class RecordingReporter {
   statuses: StatusUpdate[] = [];
   artifacts: Array<{ type: string; name: string; bytes: number }> = [];
   elementBatches: Array<Array<Record<string, unknown>>> = [];
+  observationBatches: Array<Array<Record<string, unknown>>> = [];
 
   async event(type: string, message: string, payload?: Record<string, unknown>) {
     this.events.push({ type, message, payload });
@@ -32,6 +33,10 @@ class RecordingReporter {
 
   async elements(records: Array<Record<string, unknown>>) {
     this.elementBatches.push(records);
+  }
+
+  async observations(records: Array<Record<string, unknown>>) {
+    this.observationBatches.push(records);
   }
 }
 
@@ -81,7 +86,7 @@ describe("DiscoverJobRunner — real Chromium end to end", () => {
     } as DiscoverJob;
   }
 
-  it("discovers elements, uploads evidence and completes honestly", async () => {
+  it("discovers elements, explores safely and completes honestly", async () => {
     const credentials = loadCredentialStore(config);
     const runner = new DiscoverJobRunner(browser, credentials);
     const reporter = new RecordingReporter();
@@ -92,25 +97,29 @@ describe("DiscoverJobRunner — real Chromium end to end", () => {
     expect(reporter.statuses.at(0)?.status).toBe("RUNNING");
     const final = reporter.statuses.at(-1);
     expect(final?.status).toBe("COMPLETED");
-    expect(final?.totalSteps).toBeGreaterThan(10);
-    expect(final?.passedSteps).toBeGreaterThan(0);
+    // 15 passive elements (the form-layout table itself is e1, DOM order) +
+    // 4 bounded interactions (2 select options, 1 checkbox toggle, 1 radio).
+    expect(final?.totalSteps).toBe(19);
+    expect(final?.passedSteps).toBe(17);
     expect(final?.failedSteps).toBe(0);
-    // Hidden fields are reported as skipped, never as failures.
-    expect(final?.skippedSteps).toBeGreaterThan(0);
+    // Hidden elements are reported as skipped, never as failures:
+    // the hidden input and the initially-hidden conditional section.
+    expect(final?.skippedSteps).toBe(2);
 
-    // Evidence: screenshot + trace uploaded with real bytes.
+    // Evidence: passive screenshot + interaction screenshots + trace.
     const screenshot = reporter.artifacts.find((artifact) => artifact.type === "SCREENSHOT");
     expect(screenshot?.bytes).toBeGreaterThan(10_000);
     const trace = reporter.artifacts.find((artifact) => artifact.type === "TRACE");
     expect(trace?.bytes).toBeGreaterThan(1_000);
 
     // Elements were reported for persistence.
-    expect(reporter.elementBatches.at(0)?.length).toBeGreaterThan(10);
+    expect(reporter.elementBatches.at(0)?.length).toBe(15);
 
-    // Honest progress narrative.
+    // Safe exploration ran and every step was reverted afterwards.
     const messages = reporter.events.map((event) => event.message).join("\n");
     expect(messages).toContain("Application is ready.");
-    expect(messages).toContain("No browser console errors observed.");
+    expect(messages).toContain("Exploration plan: 4 bounded interaction(s)");
+    expect(messages).toContain("the screen was reverted after each step");
     expect(messages).toContain("Discovery completed");
   }, 120_000);
 
@@ -170,5 +179,52 @@ describe("DiscoverJobRunner — real Chromium end to end", () => {
 
     expect(reporter.statuses.at(-1)?.status).toBe("FAILED");
     expect(reporter.statuses.length).toBe(2); // RUNNING + FAILED
+  }, 120_000);
+
+  it("observes and records real dependency changes with full revert", async () => {
+    const credentials = loadCredentialStore(config);
+    const runner = new DiscoverJobRunner(browser, credentials);
+    const reporter = new RecordingReporter();
+
+    await runner.run(jobFor(), reporter as unknown as ExecutionReporter);
+
+    const batch = reporter.observationBatches.at(0) ?? [];
+    expect(batch.length).toBe(4); // 2 enabled + 1 enabled + 1 visible
+    for (const observation of batch) {
+      expect(observation.reverted).toBe(true);
+    }
+
+    const byAffected = (ref: string) =>
+      batch.filter((observation) => observation.affectedRef === ref);
+
+    // select DIGER -> Parametre Değeri (e4) becomes enabled and auto-populated.
+    const paramValue = byAffected("e4");
+    expect(paramValue.length).toBe(2); // enabled + value
+    expect(
+      paramValue.find((observation) => observation.attribute === "enabled")?.afterValue,
+    ).toBe("true");
+    expect(
+      paramValue.find((observation) => observation.attribute === "value")?.afterValue,
+    ).toBe("OTO-123");
+
+    // unchecking Aktif -> Başlangıç Tarihi (e6) becomes disabled.
+    const startDate = byAffected("e6");
+    expect(startDate.length).toBe(1);
+    expect(startDate.at(0)?.attribute).toBe("enabled");
+    expect(startDate.at(0)?.beforeValue).toBe("true");
+    expect(startDate.at(0)?.afterValue).toBe("false");
+
+    // choosing Manuel -> hidden Onay Notu becomes visible.
+    const approvalNote = batch.find(
+      (observation) => observation.attribute === "visible",
+    );
+    expect(approvalNote).toBeDefined();
+    expect(approvalNote?.beforeValue).toBe("false");
+    expect(approvalNote?.afterValue).toBe("true");
+
+    // No business action was ever executed (no submit/delete/approve events).
+    const messages = reporter.events.map((event) => event.message).join(" ");
+    expect(messages).not.toContain("submit");
+    expect(messages).not.toContain("Sorgula");
   }, 120_000);
 });

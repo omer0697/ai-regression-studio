@@ -31,16 +31,19 @@ public class ArtifactController {
     private final ArtifactRepository artifactRepository;
     private final TestExecutionRepository executionRepository;
     private final DiscoveredElementService elementService;
+    private final com.ars.api.service.DependencyObservationService observationService;
     private final ArtifactStorageService storageService;
 
     public ArtifactController(
             ArtifactRepository artifactRepository,
             TestExecutionRepository executionRepository,
             DiscoveredElementService elementService,
+            com.ars.api.service.DependencyObservationService observationService,
             ArtifactStorageService storageService) {
         this.artifactRepository = artifactRepository;
         this.executionRepository = executionRepository;
         this.elementService = elementService;
+        this.observationService = observationService;
         this.storageService = storageService;
     }
 
@@ -62,6 +65,13 @@ public class ArtifactController {
     public List<DiscoveredElementResponse> listElements(@PathVariable Long id) {
         requireExecution(id);
         return elementService.listByExecution(id);
+    }
+
+    @GetMapping("/executions/{id}/observations")
+    public List<com.ars.api.dto.InternalDtos.DependencyObservationResponse> listObservations(
+            @PathVariable Long id) {
+        requireExecution(id);
+        return observationService.listByExecution(id);
     }
 
     /** Streams artifact bytes from object storage (session authenticated). */

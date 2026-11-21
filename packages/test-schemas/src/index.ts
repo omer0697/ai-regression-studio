@@ -146,6 +146,9 @@ export const environmentRefSchema = z
     allowedActions: z.array(z.string().max(60)).max(50),
     prohibitedActions: z.array(z.string().max(60)).max(50),
     browserTimeoutMs: z.number().int().min(1000).max(120_000),
+    /** Phase 3 exploration budget — bounded interaction discovery. */
+    explorationMaxInteractions: z.number().int().min(0).max(100).optional(),
+    explorationMaxOptions: z.number().int().min(0).max(20).optional(),
     screenshotEnabled: z.boolean(),
   })
   .strict();

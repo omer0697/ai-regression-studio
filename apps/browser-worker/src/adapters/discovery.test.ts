@@ -57,7 +57,7 @@ describe("GwtAdapter — real Chromium against the GWT-like fixture", () => {
       expect(byRefType("checkbox").length).toBe(1);
       expect(byRefType("checkbox").at(0)?.value).toBe("true");
       expect(byRefType("radio").length).toBe(2);
-      expect(byRefType("textarea").length).toBe(1);
+      expect(byRefType("textarea").length).toBe(2); // Açıklama + koşullu Onay Notu (gizli)
       expect(byRefType("date").length).toBe(1);
       expect(byRefType("button").length).toBeGreaterThanOrEqual(3);
 

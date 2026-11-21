@@ -52,6 +52,7 @@ public class InternalExecutionController {
     private final ExecutionEventService eventService;
     private final ExecutionProgressService progressService;
     private final DiscoveredElementService elementService;
+    private final com.ars.api.service.DependencyObservationService observationService;
     private final ArtifactRepository artifactRepository;
     private final ArtifactStorageService storageService;
 
@@ -60,12 +61,14 @@ public class InternalExecutionController {
             ExecutionEventService eventService,
             ExecutionProgressService progressService,
             DiscoveredElementService elementService,
+            com.ars.api.service.DependencyObservationService observationService,
             ArtifactRepository artifactRepository,
             ArtifactStorageService storageService) {
         this.executionRepository = executionRepository;
         this.eventService = eventService;
         this.progressService = progressService;
         this.elementService = elementService;
+        this.observationService = observationService;
         this.artifactRepository = artifactRepository;
         this.storageService = storageService;
     }
@@ -94,6 +97,15 @@ public class InternalExecutionController {
             @Valid @RequestBody InternalElementsRequest request) {
         requireExecution(id);
         int saved = elementService.saveBatch(id, request.items());
+        return ResponseEntity.ok(saved);
+    }
+
+    @PostMapping("/{id}/observations")
+    public ResponseEntity<Integer> saveObservations(
+            @PathVariable Long id,
+            @Valid @RequestBody com.ars.api.dto.InternalDtos.InternalObservationsRequest request) {
+        requireExecution(id);
+        int saved = observationService.saveBatch(id, request.items());
         return ResponseEntity.ok(saved);
     }
 

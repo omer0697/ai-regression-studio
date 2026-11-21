@@ -72,6 +72,14 @@ export class ExecutionReporter {
     );
   }
 
+  async observations(records: Array<Record<string, unknown>>) {
+    await this.withRetry(() =>
+      this.call("POST", `/api/internal/executions/${this.executionId}/observations`, {
+        items: records,
+      }),
+    );
+  }
+
   private async call(method: string, path: string, body: unknown) {
     const response = await fetch(`${this.apiBaseUrl}${path}`, {
       method,

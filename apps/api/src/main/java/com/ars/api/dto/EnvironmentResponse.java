@@ -24,6 +24,8 @@ public record EnvironmentResponse(
         List<String> allowedActions,
         List<String> prohibitedActions,
         int browserTimeoutMs,
+        int explorationMaxInteractions,
+        int explorationMaxOptions,
         boolean screenshotEnabled,
         Instant createdAt) {
 
@@ -45,6 +47,8 @@ public record EnvironmentResponse(
                 List.copyOf(entity.getAllowedActions()),
                 List.copyOf(entity.getProhibitedActions()),
                 entity.getBrowserTimeoutMs(),
+                entity.getExplorationMaxInteractions(),
+                entity.getExplorationMaxOptions(),
                 entity.isScreenshotEnabled(),
                 entity.getCreatedAt());
     }

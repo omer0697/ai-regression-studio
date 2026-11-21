@@ -63,5 +63,13 @@ public record EnvironmentRequest(
         @Max(value = 120000, message = "Browser timeout must be at most 120000 ms.")
         Integer browserTimeoutMs,
 
+        @Min(value = 0, message = "Exploration interactions must be at least 0.")
+        @Max(value = 100, message = "Exploration interactions must be at most 100.")
+        Integer explorationMaxInteractions,
+
+        @Min(value = 0, message = "Exploration options must be at most 0.")
+        @Max(value = 20, message = "Exploration options must be at most 20.")
+        Integer explorationMaxOptions,
+
         Boolean screenshotEnabled) {
 }

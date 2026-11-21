@@ -184,3 +184,12 @@ export function useExecutionElements(id: number) {
     refetchInterval: (query) => (query.state.data?.length ? false : 5000),
   });
 }
+
+export function useExecutionObservations(id: number) {
+  return useQuery({
+    queryKey: ["executions", id, "observations"] as const,
+    queryFn: () => api.listExecutionObservations(id),
+    enabled: Number.isFinite(id),
+    refetchInterval: (query) => (query.state.data?.length ? false : 5000),
+  });
+}

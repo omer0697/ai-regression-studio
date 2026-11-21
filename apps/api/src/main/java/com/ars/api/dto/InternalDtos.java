@@ -43,9 +43,29 @@ public final class InternalDtos {
             Boolean visible,
             Boolean required,
             List<String> options,
+            List<String> locatorCandidates,
             @Size(max = 600) String domPath,
             Double confidence,
             @NotBlank @Size(max = 16) String appType) {
+    }
+
+    public record DependencyObservationPayload(
+            @NotBlank @Size(max = 64) String sourceRef,
+            @Size(max = 300) String sourceLabel,
+            @NotBlank @Size(max = 40) String interaction,
+            @Size(max = 300) String value,
+            @NotBlank @Size(max = 64) String affectedRef,
+            @Size(max = 300) String affectedLabel,
+            @NotBlank @Size(max = 40) String attribute,
+            @Size(max = 500) String beforeValue,
+            @Size(max = 500) String afterValue,
+            Boolean reverted,
+            @NotBlank @Size(max = 16) String appType) {
+    }
+
+    public record InternalObservationsRequest(
+            @NotNull @Size(min = 1, max = 500, message = "At most 500 observations per batch.")
+            List<@Valid DependencyObservationPayload> items) {
     }
 
     public record InternalElementsRequest(
@@ -76,7 +96,26 @@ public final class InternalDtos {
             boolean visible,
             Boolean required,
             List<String> options,
+            List<String> locatorCandidates,
             String domPath,
             Double confidence) {
+    }
+
+    public record DependencyObservationResponse(
+            Long id,
+            Long executionId,
+            String appType,
+            String screenCode,
+            String sourceRef,
+            String sourceLabel,
+            String interaction,
+            String value,
+            String affectedRef,
+            String affectedLabel,
+            String attribute,
+            String beforeValue,
+            String afterValue,
+            boolean reverted,
+            java.time.Instant observedAt) {
     }
 }

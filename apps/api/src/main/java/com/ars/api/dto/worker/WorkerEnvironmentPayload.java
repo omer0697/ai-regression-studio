@@ -28,6 +28,8 @@ public record WorkerEnvironmentPayload(
         List<String> allowedActions,
         List<String> prohibitedActions,
         int browserTimeoutMs,
+        int explorationMaxInteractions,
+        int explorationMaxOptions,
         boolean screenshotEnabled) {
 
     public static WorkerEnvironmentPayload from(
@@ -48,6 +50,8 @@ public record WorkerEnvironmentPayload(
                 List.copyOf(env.getAllowedActions()),
                 List.copyOf(env.getProhibitedActions()),
                 env.getBrowserTimeoutMs(),
+                env.getExplorationMaxInteractions(),
+                env.getExplorationMaxOptions(),
                 env.isScreenshotEnabled());
     }
 }

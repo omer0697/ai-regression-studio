@@ -87,6 +87,13 @@ public class ApplicationEnvironment {
     @Column(name = "browser_timeout_ms", nullable = false)
     private int browserTimeoutMs = 30_000;
 
+    /** Phase 3 exploration budget — bounded interaction discovery. */
+    @Column(name = "exploration_max_interactions", nullable = false)
+    private int explorationMaxInteractions = 12;
+
+    @Column(name = "exploration_max_options", nullable = false)
+    private int explorationMaxOptions = 3;
+
     @Column(name = "screenshot_enabled", nullable = false)
     private boolean screenshotEnabled = true;
 
@@ -237,6 +244,22 @@ public class ApplicationEnvironment {
 
     public void setBrowserTimeoutMs(int browserTimeoutMs) {
         this.browserTimeoutMs = browserTimeoutMs;
+    }
+
+    public int getExplorationMaxInteractions() {
+        return explorationMaxInteractions;
+    }
+
+    public void setExplorationMaxInteractions(int explorationMaxInteractions) {
+        this.explorationMaxInteractions = explorationMaxInteractions;
+    }
+
+    public int getExplorationMaxOptions() {
+        return explorationMaxOptions;
+    }
+
+    public void setExplorationMaxOptions(int explorationMaxOptions) {
+        this.explorationMaxOptions = explorationMaxOptions;
     }
 
     public boolean isScreenshotEnabled() {

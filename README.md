@@ -178,8 +178,8 @@ docker run --rm -v "${PWD}\apps\api:/app" -v ars-maven-cache:/root/.m2 `
 | --- | --- | --- |
 | 1 — Foundation | Monorepo, web/api/worker iskeletleri, auth+RBAC, proje/ortam/ekran yönetimi, çalıştırma API'si, SSE, altyapı, testler | ✅ Tamamlandı |
 | 2 — Browser Automation | Playwright yaşam döngüsü, izole context'ler, güvenli test girişi, GWT/React adaptörleri, pasif keşif, screenshot/trace/kanıt (MinIO), canlı ilerleme | ✅ Tamamlandı |
-| 3 — UI Discovery | Etkileşimli keşif (bağımlılık tespiti), keşif bütçeleri | Sırada |
-| 4 — DeepSeek Agent | AI sağlayıcı, senaryo üretimi, semantik eşleme | Planlandı |
+| 3 — UI Discovery | Güvenli etkileşimli keşif, bağımlılık gözlemleri, keşif bütçeleri, locator adayları | ✅ Tamamlandı |
+| 4 — DeepSeek Agent | AI sağlayıcı, senaryo üretimi, semantik eşleme | Sırada |
 | 5 — Differential Engine | GWT ↔ React karşılaştırma, execute işleri, kanıt destekli bulgular | Planlandı |
 | 6 — Document Workflows | PDF üretim/karşılaştırma, imza, şifreleme | Planlandı |
 | 7 — Reporting | Hata paneli, yan yana kanıt, dışa aktarma | Planlandı |

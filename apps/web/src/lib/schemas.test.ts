@@ -22,6 +22,8 @@ const validEnvironment = {
   allowedDomains: "gwt.kap-test.example.com",
   prohibitedActions: "submit, delete",
   browserTimeoutMs: 30000,
+  explorationMaxInteractions: 12,
+  explorationMaxOptions: 3,
   screenshotEnabled: true,
 } as const;
 

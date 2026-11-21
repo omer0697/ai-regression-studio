@@ -113,6 +113,12 @@ public class EnvironmentService {
                 : new ArrayList<>(request.prohibitedActions()));
         environment.setBrowserTimeoutMs(
                 request.browserTimeoutMs() == null ? 30_000 : request.browserTimeoutMs());
+        environment.setExplorationMaxInteractions(
+                request.explorationMaxInteractions() == null ? 12
+                        : request.explorationMaxInteractions());
+        environment.setExplorationMaxOptions(
+                request.explorationMaxOptions() == null ? 3
+                        : request.explorationMaxOptions());
         environment.setScreenshotEnabled(
                 request.screenshotEnabled() == null || request.screenshotEnabled());
     }

@@ -56,6 +56,8 @@ public class DiscoveredElementService {
             element.setVisible(item.visible() == null || item.visible());
             element.setRequired(item.required());
             element.setOptions(item.options() == null ? null : List.copyOf(item.options()));
+            element.setLocatorCandidates(
+                    item.locatorCandidates() == null ? null : List.copyOf(item.locatorCandidates()));
             element.setDomPath(blankToNull(item.domPath()));
             element.setConfidence(
                     item.confidence() == null
@@ -83,6 +85,7 @@ public class DiscoveredElementService {
                         element.isVisible(),
                         element.getRequired(),
                         element.getOptions(),
+                        element.getLocatorCandidates(),
                         element.getDomPath(),
                         element.getConfidence() == null
                                 ? null

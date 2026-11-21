@@ -174,6 +174,8 @@ export function CreateEnvironmentDialog({
       allowedDomains: "",
       prohibitedActions: "submit, delete, approve, sign, send",
       browserTimeoutMs: 30000,
+      explorationMaxInteractions: 12,
+      explorationMaxOptions: 3,
       screenshotEnabled: true,
     },
   });
@@ -291,6 +293,30 @@ export function CreateEnvironmentDialog({
                 {...register("browserTimeoutMs", { valueAsNumber: true })}
               />
               <FieldError message={errors.browserTimeoutMs?.message} />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="env-max-interactions">Keşif etkileşim limiti</Label>
+              <Input
+                id="env-max-interactions"
+                type="number"
+                {...register("explorationMaxInteractions", { valueAsNumber: true })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Sınırlı güvenli etkileşim keşfi: seçim/checkbox/radyo için azami adım sayısı.
+                0 = etkileşimli keşif kapalı.
+              </p>
+              <FieldError message={errors.explorationMaxInteractions?.message} />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="env-max-options">Deneme başına seçenek limiti</Label>
+              <Input
+                id="env-max-options"
+                type="number"
+                {...register("explorationMaxOptions", { valueAsNumber: true })}
+              />
+              <FieldError message={errors.explorationMaxOptions?.message} />
             </div>
 
             <div className="flex flex-col gap-2 sm:col-span-2">

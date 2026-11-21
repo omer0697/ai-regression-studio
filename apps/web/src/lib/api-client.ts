@@ -3,6 +3,7 @@ import type {
   ArtifactInfo,
   DashboardData,
   DiscoveredElementRecord,
+  DependencyObservation,
   EnvironmentConfig,
   ExecutionEventListResponse,
   ExecutionSummary,
@@ -183,6 +184,8 @@ export const api = {
     request<ArtifactInfo[]>(`/executions/${id}/artifacts`),
   listExecutionElements: (id: number) =>
     request<DiscoveredElementRecord[]>(`/executions/${id}/elements`),
+  listExecutionObservations: (id: number) =>
+    request<DependencyObservation[]>(`/executions/${id}/observations`),
 };
 
 /** Same-origin URL that streams artifact bytes with the session cookie. */
