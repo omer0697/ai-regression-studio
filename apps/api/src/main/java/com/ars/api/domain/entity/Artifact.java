@@ -19,7 +19,7 @@ public class Artifact {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "execution_id", nullable = false)
+    @Column(name = "execution_id")
     private Long executionId;
 
     @Column(name = "artifact_type", nullable = false, length = 30)

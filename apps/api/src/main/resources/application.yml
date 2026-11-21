@@ -1,6 +1,10 @@
 spring:
   application:
     name: ars-api
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 60MB
 
   datasource:
     url: ${ARS_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ars}

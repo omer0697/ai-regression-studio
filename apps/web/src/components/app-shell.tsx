@@ -42,7 +42,7 @@ const PHASED_NAV: NavItem[] = [
   { href: "/bugs", label: "Hata Raporları", icon: <IconBug /> },
   { href: "/pdf", label: "PDF Karşılaştırma", icon: <IconFileText /> },
   { href: "/ai-config", label: "AI Ayarları", icon: <IconCpu /> },
-  { href: "/soon/settings", label: "Ayarlar", icon: <IconSettings />, phase: "F8" },
+  { href: "/settings", label: "Ayarlar", icon: <IconSettings /> },
 ];
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {

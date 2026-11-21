@@ -233,7 +233,80 @@ export const api = {
       method: "POST",
       body: { status },
     }),
+  comparePdfs: (
+    projectId: number,
+    pdfA: File,
+    pdfB: File,
+    screenCode: string,
+    expectedFields: string,
+  ) => {
+    const form = new FormData();
+    form.append("pdfA", pdfA);
+    form.append("pdfB", pdfB);
+    form.append("screenCode", screenCode);
+    form.append("expectedFields", expectedFields);
+    return fetch(`${API_BASE}/projects/${projectId}/pdf/compare`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        ...(csrfTokenFromCookie() ? { "X-XSRF-TOKEN": csrfTokenFromCookie() ?? "" } : {}),
+      },
+      body: form,
+    }).then(async (response) => {
+      const body = await response.json();
+      if (!response.ok) {
+        throw new ApiError(
+          response.status,
+          body.code ?? `HTTP_${response.status}`,
+          body.message ?? "PDF karşılaştırması başarısız oldu.",
+        );
+      }
+      return body as PdfComparisonResult;
+    });
+  },
+  listPdfComparisons: (projectId: number) =>
+    request<PdfComparisonHistory[]>(`/projects/${projectId}/pdf/comparisons`),
 };
+
+/** Standalone multipart PDF comparison (fetch-based, CSRF-aware). */
+export async function comparePdfs(
+  projectId: number,
+  pdfA: File,
+  pdfB: File,
+  screenCode: string,
+  expectedFields: string,
+): Promise<PdfComparisonResult> {
+  return api.comparePdfs(projectId, pdfA, pdfB, screenCode, expectedFields);
+}
+
+export interface PdfComparisonResult {
+  id: number;
+  verdict: "MATCH" | "DIFFERENT" | "ERROR";
+  pagesA: number;
+  pagesB: number;
+  differences: Array<{
+    kind: string;
+    field: string;
+    expected: string;
+    actual: string;
+    page: number | null;
+  }>;
+  artifactAId: number;
+  artifactBId: number;
+  createdAt: string;
+}
+
+export interface PdfComparisonHistory {
+  id: number;
+  screenCode: string | null;
+  sourceAName: string;
+  sourceBName: string;
+  pagesA: number | null;
+  pagesB: number | null;
+  verdict: string;
+  differences: PdfComparisonResult["differences"];
+  createdAt: string;
+}
 
 export interface MappingInfo {
   id: number;
