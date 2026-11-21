@@ -89,7 +89,7 @@ export default function ChatPage() {
             onChange={(event) => setProjectId(event.target.value)}
           >
             <option value="">Proje seçin…</option>
-            {(projects?.items ?? []).map((project) => (
+            {(projects ?? []).map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
               </option>

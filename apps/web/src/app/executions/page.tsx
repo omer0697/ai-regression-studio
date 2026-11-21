@@ -27,7 +27,7 @@ export default function ExecutionsPage() {
 
       {isLoading ? (
         <div className="h-40 animate-pulse rounded-xl bg-surface-2/50" />
-      ) : !data || data.items.length === 0 ? (
+      ) : !data || data.length === 0 ? (
         <EmptyState
           title="Kayıt yok"
           description="Bir proje detay sayfasından çalıştırma başlatın."
@@ -47,7 +47,7 @@ export default function ExecutionsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.items.map((execution) => (
+            {data.map((execution) => (
               <TableRow key={execution.id}>
                 <TableCell className="tabular-nums text-muted-foreground">
                   {execution.id}

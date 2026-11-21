@@ -174,7 +174,7 @@ export default function ProjectDetailPage() {
     return <div className="h-40 animate-pulse rounded-xl bg-surface-2/50" />;
   }
 
-  const availableScreens = (screens?.items ?? []).filter((screen) => screen.active);
+  const availableScreens = (screens ?? []).filter((screen) => screen.active);
 
   return (
     <div className="flex flex-col gap-6">
@@ -228,9 +228,9 @@ export default function ProjectDetailPage() {
             <CreateEnvironmentDialog projectId={projectId} />
           </div>
 
-          {environments && environments.items.length > 0 ? (
+          {environments && environments.length > 0 ? (
             <div className="grid gap-4 lg:grid-cols-2">
-              {environments.items.map((environment) => (
+              {environments.map((environment) => (
                 <EnvironmentCard
                   key={environment.id}
                   environment={environment}
@@ -261,7 +261,7 @@ export default function ProjectDetailPage() {
             <CreateScreenDialog projectId={projectId} />
           </div>
 
-          {screens && screens.items.length > 0 ? (
+          {screens && screens.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -273,7 +273,7 @@ export default function ProjectDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {screens.items.map((screen) => (
+                {screens.map((screen) => (
                   <TableRow key={screen.id}>
                     <TableCell className="font-mono text-xs font-medium text-primary">
                       {screen.screenCode}
@@ -375,7 +375,7 @@ export default function ProjectDetailPage() {
             </CardContent>
           </Card>
 
-          {executions && executions.items.length > 0 ? (
+          {executions && executions.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -388,7 +388,7 @@ export default function ProjectDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {executions.items.map((execution) => (
+                {executions.map((execution) => (
                   <TableRow key={execution.id}>
                     <TableCell className="tabular-nums text-muted-foreground">
                       {execution.id}

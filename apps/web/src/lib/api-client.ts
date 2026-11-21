@@ -127,7 +127,7 @@ export const api = {
   getDashboard: () => request<DashboardData>("/dashboard"),
 
   // ---- Projects ----
-  listProjects: () => request<{ items: ProjectSummary[] }>("/projects"),
+  listProjects: () => request<ProjectSummary[]>("/projects"),
   getProject: (id: number) => request<ProjectDetail>(`/projects/${id}`),
   createProject: (body: { name: string; description?: string; environmentName: string }) =>
     request<ProjectDetail>("/projects", { method: "POST", body }),
@@ -139,7 +139,7 @@ export const api = {
 
   // ---- Environments ----
   listEnvironments: (projectId: number) =>
-    request<{ items: EnvironmentConfig[] }>(`/projects/${projectId}/environments`),
+    request<EnvironmentConfig[]>(`/projects/${projectId}/environments`),
   createEnvironment: (projectId: number, body: Record<string, unknown>) =>
     request<EnvironmentConfig>(`/projects/${projectId}/environments`, {
       method: "POST",
@@ -155,7 +155,7 @@ export const api = {
 
   // ---- Screens ----
   listScreens: (projectId: number) =>
-    request<{ items: ScreenDefinition[] }>(`/projects/${projectId}/screens`),
+    request<ScreenDefinition[]>(`/projects/${projectId}/screens`),
   createScreen: (projectId: number, body: Record<string, unknown>) =>
     request<ScreenDefinition>(`/projects/${projectId}/screens`, {
       method: "POST",
@@ -170,9 +170,9 @@ export const api = {
     request<void>(`/projects/${projectId}/screens/${screenId}`, { method: "DELETE" }),
 
   // ---- Executions ----
-  listExecutions: () => request<{ items: ExecutionSummary[] }>("/executions"),
+  listExecutions: () => request<ExecutionSummary[]>("/executions"),
   listProjectExecutions: (projectId: number) =>
-    request<{ items: ExecutionSummary[] }>(`/projects/${projectId}/executions`),
+    request<ExecutionSummary[]>(`/projects/${projectId}/executions`),
   getExecution: (id: number) => request<ExecutionSummary>(`/executions/${id}`),
   startExecution: (projectId: number, body: { screenId: number; mode: string }) =>
     request<ExecutionSummary>(`/projects/${projectId}/executions`, {

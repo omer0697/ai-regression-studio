@@ -30,7 +30,7 @@ export default function ProjectsPage() {
 
       {isLoading ? (
         <div className="h-40 animate-pulse rounded-xl bg-surface-2/50" />
-      ) : !data || data.items.length === 0 ? (
+      ) : !data || data.length === 0 ? (
         <EmptyState
           icon={<IconFolder width={28} height={28} />}
           title="Henüz proje yok"
@@ -52,7 +52,7 @@ export default function ProjectsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.items.map((project) => (
+            {data.map((project) => (
               <TableRow key={project.id}>
                 <TableCell>
                   <Link

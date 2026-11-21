@@ -89,7 +89,7 @@ export default function AiDiscoveryPage() {
                 }}
               >
                 <option value="">Proje seçin…</option>
-                {(projects?.items ?? []).map((project) => (
+                {(projects ?? []).map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.name}
                   </option>
@@ -105,7 +105,7 @@ export default function AiDiscoveryPage() {
                 disabled={!projectId}
               >
                 <option value="">Ekran seçin…</option>
-                {(screens?.items ?? []).map((screen) => (
+                {(screens ?? []).map((screen) => (
                   <option key={screen.id} value={screen.id}>
                     {screen.screenCode} — {screen.name}
                   </option>
