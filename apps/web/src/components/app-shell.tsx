@@ -37,6 +37,7 @@ const PRIMARY_NAV: NavItem[] = [
 
 const PHASED_NAV: NavItem[] = [
   { href: "/ai-discovery", label: "AI Keşif & Test", icon: <IconSparkles /> },
+  { href: "/chat", label: "Proje Sohbeti", icon: <IconPlay /> },
   { href: "/scenarios", label: "Senaryo Kütüphanesi", icon: <IconActivity /> },
   { href: "/executions", label: "GWT ↔ React", icon: <IconLayers /> },
   { href: "/bugs", label: "Hata Raporları", icon: <IconBug /> },

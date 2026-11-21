@@ -165,19 +165,18 @@ public class WorkerClient {
         }
     }
 
-    /** Queues a Phase 5 comparison job (both apps + plan). */
-    public DispatchOutcome dispatchComparison(
-            com.ars.api.dto.worker.WorkerComparisonJobPayload payload) {
+    /** Queues a Phase 5 comparison or Phase 8 combination job (both apps). */
+    public DispatchOutcome dispatchComparison(Object payload) {
         if (!isConfigured()) {
             return DispatchOutcome.notSupported("WORKER_NOT_CONFIGURED",
                     "Browser worker base URL is not configured (ARS_WORKER_BASE_URL).");
         }
         try {
             try {
-                log.info("Comparison job payload: {}",
+                log.info("Worker job payload: {}",
                         objectMapper.writeValueAsString(payload));
             } catch (com.fasterxml.jackson.core.JsonProcessingException debugEx) {
-                log.warn("Could not log comparison payload: {}", debugEx.getMessage());
+                log.warn("Could not log worker payload: {}", debugEx.getMessage());
             }
             return restClient.post()
                     .uri("/api/jobs")

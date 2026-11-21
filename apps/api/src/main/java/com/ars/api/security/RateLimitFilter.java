@@ -16,10 +16,9 @@ import java.io.IOException;
 /**
  * Simple in-memory per-IP rate limiter (Phase 8 hardening). Login and AI
  * endpoints get a lower budget so brute-force attempts are throttled; other
- * endpoints allow normal dashboard polling. Production deployments should
- * move this to a shared store and tune via ARS_RATE_LIMIT_* variables.
+ * endpoints allow normal dashboard polling. Registered as a bean by
+ * SecurityConfig (not a @Component — it needs explicit filter ordering).
  */
-@Component
 public class RateLimitFilter extends jakarta.servlet.http.HttpFilter {
 
     private static final int DEFAULT_LIMIT_PER_MINUTE = 600;

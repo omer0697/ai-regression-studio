@@ -266,7 +266,52 @@ export const api = {
   },
   listPdfComparisons: (projectId: number) =>
     request<PdfComparisonHistory[]>(`/projects/${projectId}/pdf/comparisons`),
+  listRequirements: (projectId: number, screenCode: string) =>
+    request<RequirementInfo[]>(
+      `/projects/${projectId}/screens/${screenCode}/requirements`,
+    ),
+  addManualRequirement: (projectId: number, screenCode: string, title: string, content?: string) =>
+    request<RequirementInfo>(
+      `/projects/${projectId}/screens/${screenCode}/requirements`,
+      { method: "POST", body: { title, content: content ?? null } },
+    ),
+  importRequirements: (projectId: number, screenCode: string, confluencePageId: string) =>
+    request<{ imported: number }>(
+      `/projects/${projectId}/screens/${screenCode}/requirements/import`,
+      { method: "POST", body: { confluencePageId } },
+    ),
+  analyzeRequirements: (projectId: number, screenCode: string) =>
+    request<{ analyzed: number }>(
+      `/projects/${projectId}/screens/${screenCode}/requirements/analyze`,
+      { method: "POST" },
+    ),
+  sendChat: (projectId: number, message: string) =>
+    request<ChatReply>(`/projects/${projectId}/chat`, {
+      method: "POST",
+      body: { message },
+    }),
+  listChat: (projectId: number) =>
+    request<ChatReply[]>(`/projects/${projectId}/chat`),
 };
+
+export interface RequirementInfo {
+  id: number;
+  screenCode: string;
+  title: string;
+  content: string | null;
+  confluenceId: string | null;
+  sourceUrl: string | null;
+  status: "PENDING" | "VERIFIED" | "UNSATISFIED" | "PARTIAL" | "MANUAL_REVIEW";
+  coverage: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface ChatReply {
+  id: number;
+  role: "USER" | "ASSISTANT";
+  content: string;
+  createdAt: string;
+}
 
 /** Standalone multipart PDF comparison (fetch-based, CSRF-aware). */
 export async function comparePdfs(

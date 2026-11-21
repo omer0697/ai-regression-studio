@@ -49,6 +49,7 @@ import {
   useStartExecution,
 } from "@/lib/api-hooks";
 import { MODE_LABELS, formatDate } from "@/lib/utils";
+import { RequirementsPanel } from "@/components/requirements-panel";
 import type { EnvironmentConfig } from "@ars/shared-contracts";
 
 function EnvironmentCard({
@@ -254,6 +255,7 @@ export default function ProjectDetailPage() {
         </TabsContent>
 
         <TabsContent value="screens" className="flex flex-col gap-4">
+          <RequirementsPanel projectId={projectId} screenCode="KPY68" />
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Ekran Kaydı</h2>
             <CreateScreenDialog projectId={projectId} />
@@ -351,6 +353,7 @@ export default function ProjectDetailPage() {
                   >
                     <option value="DISCOVERY">Keşif (GWT)</option>
                     <option value="COMPARISON">Karşılaştırma (GWT ↔ React)</option>
+                    <option value="COMBINATION">Kombinasyon (tüm alan kombinasyonları)</option>
                   </select>
                 </div>
               </div>

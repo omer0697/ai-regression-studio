@@ -4,6 +4,7 @@ import { BrowserLifecycle } from "./browser/lifecycle.js";
 import { loadConfig, type WorkerConfig } from "./config.js";
 import { loadCredentialStore, type CredentialStore } from "./credentials.js";
 import { ComparisonRunner } from "./comparison/comparison.js";
+import { CombinationRunner } from "./comparison/combination.js";
 import { healthRoutes } from "./routes/health.js";
 import { fixtureRoutes } from "./routes/fixtures.js";
 import { createJobRoutes } from "./routes/jobs.js";
@@ -18,6 +19,7 @@ export interface BuildAppOptions {
   credentials?: CredentialStore;
   runner?: DiscoverJobRunner;
   comparisonRunner?: ComparisonRunner;
+  combinationRunner?: CombinationRunner;
 }
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
@@ -27,6 +29,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const runner = options.runner ?? new DiscoverJobRunner(browser, credentials);
   const comparisonRunner =
       options.comparisonRunner ?? new ComparisonRunner(browser, credentials);
+  const combinationRunner =
+      options.combinationRunner ?? new CombinationRunner(browser, credentials);
 
   const app = Fastify({
     logger: {
@@ -63,7 +67,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   void app.register(healthRoutes);
   void app.register(fixtureRoutes);
-  void app.register(createJobRoutes(config, browser, credentials, runner, comparisonRunner));
+  void app.register(
+    createJobRoutes(config, browser, credentials, runner, comparisonRunner, combinationRunner),
+  );
 
   return app;
 }

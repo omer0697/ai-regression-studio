@@ -18,7 +18,8 @@ public record AppProperties(
         Cors cors,
         Internal internal,
         Storage storage,
-        Ai ai) {
+        Ai ai,
+        Confluence confluence) {
 
     public record Seed(String adminUsername, String adminPassword) {
     }
@@ -61,6 +62,14 @@ public record AppProperties(
             return baseUrl != null && !baseUrl.isBlank()
                     && apiKey != null && !apiKey.isBlank()
                     && model != null && !model.isBlank();
+        }
+    }
+
+    /** Company Confluence (requirement source). Optional by design. */
+    public record Confluence(String baseUrl, String token) {
+        public boolean enabled() {
+            return baseUrl != null && !baseUrl.isBlank()
+                    && token != null && !token.isBlank();
         }
     }
 }

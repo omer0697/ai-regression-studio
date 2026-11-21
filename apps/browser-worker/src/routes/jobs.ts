@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import { hasBrowserAutomation } from "../capabilities.js";
 import { ComparisonRunner } from "../comparison/comparison.js";
+import { CombinationRunner } from "../comparison/combination.js";
 import { DiscoverJobRunner } from "../runner.js";
 import { ExecutionReporter } from "../reporter.js";
 import type { BrowserLifecycle } from "../browser/lifecycle.js";
@@ -15,6 +16,7 @@ export function createJobRoutes(
   credentials: CredentialStore,
   runner: DiscoverJobRunner,
   comparisonRunner?: ComparisonRunner,
+  combinationRunner?: CombinationRunner,
 ) {
   return async function jobRoutes(app: FastifyInstance): Promise<void> {
     /** Executions currently processed by this worker instance. */
@@ -98,6 +100,16 @@ export function createJobRoutes(
               return;
             }
             await comparisonRunner.run(job, reporter);
+          } else if (job.jobType === "combine") {
+            if (!combinationRunner) {
+              await reporter.status({
+                status: "FAILED",
+                errorCode: "COMBINATION_RUNNER_UNAVAILABLE",
+                statusMessage: "Combination runner is not available in this build.",
+              });
+              return;
+            }
+            await combinationRunner.run(job, reporter);
           } else {
             await runner.run(job, reporter);
           }

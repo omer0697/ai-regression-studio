@@ -85,6 +85,10 @@ public class ExecutionService {
             throw ApiException.conflict("ENVIRONMENT_MISSING",
                     "COMPARISON mode requires both LEGACY_GWT and REACT environments.");
         }
+        if (mode == ExecutionMode.COMBINATION && reactEnvironment == null) {
+            throw ApiException.conflict("ENVIRONMENT_MISSING",
+                    "COMBINATION mode requires both LEGACY_GWT and REACT environments.");
+        }
 
         TestExecution execution = executionRepository
                 .save(new TestExecution(project.getId(), screen.getId(), mode, null));
@@ -115,6 +119,22 @@ public class ExecutionService {
                     com.ars.api.dto.worker.WorkerEnvironmentPayload.from(reactEnvironment),
                     java.util.List.of());
             outcome = workerClient.dispatchComparison(comparisonPayload);
+        } else if (mode == ExecutionMode.COMBINATION) {
+            int budget = Math.max(1, legacyEnvironment.getExplorationMaxInteractions());
+            events.append(execution.getId(),
+                    com.ars.api.domain.enums.ExecutionEventType.INFO,
+                    "Dispatching full-combination testing (budget: %d).".formatted(budget));
+            var combinationPayload = new com.ars.api.dto.worker.WorkerCombinationJobPayload(
+                    "combine",
+                    execution.getId(),
+                    project.getId(),
+                    screen.getScreenCode(),
+                    screen.getName(),
+                    ExecutionMode.COMBINATION,
+                    budget,
+                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(legacyEnvironment),
+                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(reactEnvironment));
+            outcome = workerClient.dispatchComparison(combinationPayload);
         } else {
             var payload = new com.ars.api.dto.worker.WorkerDiscoverJobPayload(
                     "discover",

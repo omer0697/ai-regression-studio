@@ -76,6 +76,11 @@ app:
     api-key: ${AI_API_KEY:}
     timeout-seconds: ${AI_TIMEOUT_SECONDS:60}
     max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:2048}
+  confluence:
+    # Requirement source. Optional: the requirements page reports
+    # CONFLUENCE_NOT_CONFIGURED honestly when blank.
+    base-url: ${ARS_CONFLUENCE_BASE_URL:}
+    token: ${ARS_CONFLUENCE_TOKEN:}
 
 logging:
   level:

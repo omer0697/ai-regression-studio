@@ -215,10 +215,35 @@ export const comparisonJobSchema = z
 
 export type ComparisonJob = z.infer<typeof comparisonJobSchema>;
 
+/**
+ * V8 user-driven: full-combination testing. The worker fills every discovered
+ * field with every bounded combination (singles first, then pairwise, then
+ * sampled products within the budget) in BOTH apps, reloads between
+ * combinations (guaranteed reset to a known state) and reports per-field
+ * state differences as findings.
+ */
+export const combinationJobSchema = z
+  .object({
+    jobType: z.literal("combine"),
+    executionId: z.number().int().positive(),
+    projectId: z.number().int().positive(),
+    screenCode: z.string().min(1).max(64),
+    screenName: z.string().min(1).max(120),
+    mode: z.literal("COMBINATION"),
+    /** Bounded matrix budget — prevents combinatorial explosion. */
+    maxCombinations: z.number().int().min(1).max(200),
+    legacyApp: environmentRefSchema,
+    reactApp: environmentRefSchema,
+  })
+  .strict();
+
+export type CombinationJob = z.infer<typeof combinationJobSchema>;
+
 export const workerJobSchema = z.discriminatedUnion("jobType", [
   discoverJobSchema,
   executeJobSchema,
   comparisonJobSchema,
+  combinationJobSchema,
 ]);
 
 /** Structured error body the worker returns for unimplemented capabilities. */
