@@ -1,0 +1,43 @@
+# Overlay: adds the application services on top of docker-compose.yml.
+# Usage:
+#   cd infrastructure
+#   docker compose -f docker-compose.yml -f docker-compose.full.yml up -d --build
+
+services:
+  api:
+    build:
+      context: ../apps/api
+    environment:
+      ARS_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ars}
+      ARS_DATASOURCE_USERNAME: ${POSTGRES_USER:-ars}
+      ARS_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-ars}
+      ARS_SEED_ADMIN_USERNAME: ${ARS_SEED_ADMIN_USERNAME:-admin}
+      ARS_SEED_ADMIN_PASSWORD: ${ARS_SEED_ADMIN_PASSWORD:-admin123!}
+      ARS_WORKER_BASE_URL: http://worker:9100
+      ARS_WEB_ORIGINS: http://localhost:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ..
+      dockerfile: apps/browser-worker/Dockerfile
+    environment:
+      WORKER_PORT: "9100"
+    ports:
+      - "9100:9100"
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    environment:
+      # Next.js rewrites /backend/* to this target (same-origin cookies/CSRF).
+      API_PROXY_TARGET: http://api:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api

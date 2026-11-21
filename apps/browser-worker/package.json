@@ -1,0 +1,26 @@
+{
+  "name": "@ars/browser-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ARS browser worker — Playwright-driven browser sessions (Phase 2 implements automation)",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ars/shared-contracts": "*",
+    "@ars/test-schemas": "*",
+    "fastify": "^5.6.2",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.1"
+  }
+}

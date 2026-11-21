@@ -1,0 +1,21 @@
+{
+  "name": "ai-regression-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-powered GWT to React regression testing platform",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/shared-contracts && npm run build -w packages/test-schemas && npm run build -w apps/browser-worker && npm run build -w apps/web",
+    "test": "npm run test -w packages/shared-contracts && npm run test -w packages/test-schemas && npm run test -w apps/browser-worker && npm run test -w apps/web",
+    "dev:web": "npm run dev -w apps/web",
+    "dev:worker": "npm run dev -w apps/browser-worker",
+    "lint": "npm run lint -w apps/web",
+    "typecheck": "npm run typecheck -w packages/shared-contracts && npm run typecheck -w packages/test-schemas && npm run typecheck -w apps/browser-worker && npm run typecheck -w apps/web"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}

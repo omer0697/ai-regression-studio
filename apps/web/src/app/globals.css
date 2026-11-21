@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: oklch(0.17 0.015 265);
+  --color-surface: oklch(0.21 0.016 265);
+  --color-surface-2: oklch(0.25 0.018 265);
+  --color-border-subtle: oklch(0.34 0.02 265);
+  --color-foreground: oklch(0.96 0.004 265);
+  --color-muted-foreground: oklch(0.68 0.015 265);
+  --color-primary: oklch(0.72 0.15 250);
+  --color-primary-foreground: oklch(0.16 0.03 250);
+  --color-accent: oklch(0.78 0.12 190);
+  --color-success: oklch(0.76 0.15 155);
+  --color-warning: oklch(0.82 0.14 85);
+  --color-danger: oklch(0.68 0.19 25);
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  border-color: var(--color-border-subtle);
+}
+
+::selection {
+  background-color: oklch(0.72 0.15 250 / 0.35);
+}
