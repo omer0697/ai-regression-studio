@@ -53,6 +53,8 @@ public class InternalExecutionController {
     private final ExecutionProgressService progressService;
     private final DiscoveredElementService elementService;
     private final com.ars.api.service.DependencyObservationService observationService;
+    private final com.ars.api.service.ElementMappingService mappingService;
+    private final com.ars.api.service.BugFindingService findingService;
     private final ArtifactRepository artifactRepository;
     private final ArtifactStorageService storageService;
 
@@ -62,6 +64,8 @@ public class InternalExecutionController {
             ExecutionProgressService progressService,
             DiscoveredElementService elementService,
             com.ars.api.service.DependencyObservationService observationService,
+            com.ars.api.service.ElementMappingService mappingService,
+            com.ars.api.service.BugFindingService findingService,
             ArtifactRepository artifactRepository,
             ArtifactStorageService storageService) {
         this.executionRepository = executionRepository;
@@ -69,6 +73,8 @@ public class InternalExecutionController {
         this.progressService = progressService;
         this.elementService = elementService;
         this.observationService = observationService;
+        this.mappingService = mappingService;
+        this.findingService = findingService;
         this.artifactRepository = artifactRepository;
         this.storageService = storageService;
     }
@@ -106,6 +112,24 @@ public class InternalExecutionController {
             @Valid @RequestBody com.ars.api.dto.InternalDtos.InternalObservationsRequest request) {
         requireExecution(id);
         int saved = observationService.saveBatch(id, request.items());
+        return ResponseEntity.ok(saved);
+    }
+
+    @PostMapping("/{id}/mapping")
+    public ResponseEntity<Integer> saveMapping(
+            @PathVariable Long id,
+            @Valid @RequestBody com.ars.api.dto.InternalDtos.InternalMappingRequest request) {
+        requireExecution(id);
+        int saved = mappingService.saveBatch(id, request.items());
+        return ResponseEntity.ok(saved);
+    }
+
+    @PostMapping("/{id}/findings")
+    public ResponseEntity<Integer> saveFindings(
+            @PathVariable Long id,
+            @Valid @RequestBody com.ars.api.dto.InternalDtos.InternalFindingsRequest request) {
+        requireExecution(id);
+        int saved = findingService.saveBatch(id, request.items());
         return ResponseEntity.ok(saved);
     }
 

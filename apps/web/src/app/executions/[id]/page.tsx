@@ -26,6 +26,7 @@ import {
   useExecution,
   useExecutionArtifacts,
   useExecutionElements,
+  useExecutionFindings,
   useExecutionObservations,
   useStartExecution,
 } from "@/lib/api-hooks";
@@ -76,6 +77,7 @@ export default function ExecutionDetailPage() {
   const { data: artifacts } = useExecutionArtifacts(executionId);
   const { data: elements } = useExecutionElements(executionId);
   const { data: observations } = useExecutionObservations(executionId);
+  const { data: findings } = useExecutionFindings(executionId);
   const stream = useExecutionStream(Number.isFinite(executionId) ? executionId : null);
 
   const startExecution = useStartExecution(execution?.projectId ?? 0);
@@ -258,6 +260,50 @@ export default function ExecutionDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {findings && findings.length > 0 ? (
+            <Card className="border-danger/40">
+              <CardHeader>
+                <CardTitle>Tespit Edilen Davranış Farkları</CardTitle>
+                <CardDescription>
+                  {findings.length} kanıt destekli bulgu — GWT beklenen davranışı,
+                  React gerçekleşen davranışı temsil eder. Detaylar Hata Raporları
+                  sayfasında.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2">
+                {findings.map((finding) => (
+                  <div
+                    key={finding.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border-subtle bg-surface-2/40 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">
+                        <span className="font-mono text-xs text-primary">
+                          {finding.bugCode}
+                        </span>{" "}
+                        {finding.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {finding.expectedBehavior} · {finding.actualBehavior}
+                      </p>
+                    </div>
+                    <Badge
+                      tone={
+                        finding.severity === "HIGH"
+                          ? "danger"
+                          : finding.severity === "MEDIUM"
+                            ? "warning"
+                            : "muted"
+                      }
+                    >
+                      {finding.severity}
+                    </Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHeader>

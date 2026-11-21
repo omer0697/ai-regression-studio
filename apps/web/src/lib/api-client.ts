@@ -1,6 +1,7 @@
 import type {
   ApiErrorShape,
   ArtifactInfo,
+  BugFindingInfo,
   DashboardData,
   DiscoveredElementRecord,
   DependencyObservation,
@@ -221,7 +222,29 @@ export const api = {
       method: "POST",
       body: { reason: reason ?? null },
     }),
+  listBugs: (status?: string) =>
+    request<BugFindingInfo[]>(status ? `/bugs?status=${status}` : "/bugs"),
+  listExecutionFindings: (id: number) =>
+    request<BugFindingInfo[]>(`/executions/${id}/findings`),
+  listExecutionMapping: (id: number) =>
+    request<MappingInfo[]>(`/executions/${id}/mapping`),
+  updateBugStatus: (id: number, status: "CONFIRMED" | "DISMISSED") =>
+    request<BugFindingInfo>(`/bugs/${id}/status`, {
+      method: "POST",
+      body: { status },
+    }),
 };
+
+export interface MappingInfo {
+  id: number;
+  legacyRef: string;
+  legacyLabel: string | null;
+  reactRef: string | null;
+  reactLabel: string | null;
+  confidence: number;
+  method: string;
+  needsReview: boolean;
+}
 
 export interface ScenarioInfo {
   id: number;

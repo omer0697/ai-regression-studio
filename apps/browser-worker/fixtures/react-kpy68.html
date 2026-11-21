@@ -19,13 +19,28 @@
   </style>
 </head>
 <body>
+  <!--
+    INTENTIONALLY DEFECTIVE React fixture (master prompt §20).
+    Known regressions versus the GWT fixture:
+      1. FIELD_MISSING: the "Açıklama" textarea is missing entirely.
+      2. FIELD_MISSING: the conditional "Onay Notu" section never appears
+         (choosing Manuel does nothing).
+      3. DEPENDENCY_MISMATCH: "Parametre Değeri" stays disabled when DIGER is
+         selected (GWT enables and auto-populates it).
+      4. STATE_MISMATCH: "Başlangıç Tarihi" stays enabled when "Aktif" is
+         unchecked (GWT disables it).
+      5. VALUE_MISMATCH: "Parametre Kodu" is empty (GWT shows KPY-001 —
+         simulates an API-bound value not reaching the form).
+      6. TABLE_MISMATCH: the results table's second row shows XYZ-8 instead
+         of XYZ-9.
+  -->
   <div id="root">
     <header class="app-header">KAP — KPY68 Parametre Tanımları</header>
     <div class="app-content">
       <form class="ant-form">
         <div class="ant-form-item">
           <div class="ant-form-item-label"><label for="paramCode">Parametre Kodu</label></div>
-          <input class="ant-input" id="paramCode" name="paramCode" value="KPY-001" required>
+          <input class="ant-input" id="paramCode" name="paramCode" value="" required>
         </div>
         <div class="ant-form-item">
           <div class="ant-form-item-label"><label for="paramType">Parametre Tipi</label></div>
@@ -37,11 +52,7 @@
         </div>
         <div class="ant-form-item">
           <div class="ant-form-item-label"><label for="paramValue">Parametre Değeri</label></div>
-          <input class="ant-input" id="paramValue" name="paramValue" value="ABC-123" disabled>
-        </div>
-        <div class="ant-form-item">
-          <div class="ant-form-item-label"><label for="description">Açıklama</label></div>
-          <textarea class="ant-input" id="description" name="description" rows="3">Varsayılan açıklama</textarea>
+          <input class="ant-input" id="paramValue" name="paramValue" value="" disabled>
         </div>
         <div class="ant-form-item">
           <div class="ant-form-item-label"><label for="startDate">Başlangıç Tarihi</label></div>
@@ -50,6 +61,11 @@
         <div class="ant-form-item">
           <div class="ant-form-item-label"><label for="active">Aktif</label></div>
           <input type="checkbox" id="active" name="active" checked>
+        </div>
+        <div class="ant-form-item">
+          <div class="ant-form-item-label"><label for="approvalType">Onay Tipi</label></div>
+          <input type="radio" id="approvalAuto" name="approvalType" value="OTOMATIK" checked> Otomatik
+          <input type="radio" id="approvalManuel" name="approvalType" value="MANUEL"> Manuel
         </div>
         <div class="ant-form-item">
           <span class="ant-btn" role="button" tabindex="0" id="btnSearch">Sorgula</span>
@@ -62,7 +78,7 @@
         <thead><tr><th>Kod</th><th>Tip</th><th>Değer</th><th>Durum</th></tr></thead>
         <tbody>
           <tr><td>KPY-001</td><td>OZEL</td><td>ABC-123</td><td>Aktif</td></tr>
-          <tr><td>KPY-002</td><td>STANDART</td><td>XYZ-9</td><td>Pasif</td></tr>
+          <tr><td>KPY-002</td><td>STANDART</td><td>XYZ-8</td><td>Pasif</td></tr>
         </tbody>
       </table>
     </div>

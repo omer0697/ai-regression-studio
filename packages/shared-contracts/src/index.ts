@@ -231,6 +231,24 @@ export interface ArtifactInfo {
   createdAt: string;
 }
 
+export interface BugFindingInfo {
+  id: number;
+  bugCode: string;
+  projectId: number;
+  executionId: number;
+  screenCode: string;
+  category: string;
+  severity: "HIGH" | "MEDIUM" | "LOW";
+  title: string;
+  expectedBehavior: string | null;
+  actualBehavior: string | null;
+  reproduction: Record<string, unknown> | null;
+  evidenceArtifacts: string[] | null;
+  aiHypothesis: string | null;
+  status: "DETECTED" | "CONFIRMED" | "DISMISSED";
+  createdAt: string;
+}
+
 /**
  * A dependency observation from Phase 3 interaction exploration:
  * "applying interaction X on source changed attribute A of affected element

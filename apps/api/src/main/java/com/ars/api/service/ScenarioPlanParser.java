@@ -35,8 +35,8 @@ public class ScenarioPlanParser {
             "fill", "selectOption", "chooseRadio");
 
     private static final Set<String> ACTIONS_ALLOWING_VALUE = Set.of(
-            "fill", "selectOption", "chooseRadio", "assertValue", "assertText", "wait",
-            "navigate");
+            "fill", "selectOption", "setCheckbox", "chooseRadio", "assertValue",
+            "assertText", "wait", "navigate");
 
     private static final Set<String> PLAN_FIELDS = Set.of(
             "scenarioName", "screen", "description", "steps");

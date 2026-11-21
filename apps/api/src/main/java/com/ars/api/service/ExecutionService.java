@@ -9,9 +9,11 @@ import com.ars.api.domain.enums.AppType;
 import com.ars.api.domain.enums.ExecutionMode;
 import com.ars.api.domain.enums.ExecutionStatus;
 import com.ars.api.domain.repository.ApplicationEnvironmentRepository;
+import com.ars.api.domain.repository.DependencyObservationRepository;
 import com.ars.api.domain.repository.ProjectRepository;
 import com.ars.api.domain.repository.ScreenDefinitionRepository;
 import com.ars.api.domain.repository.TestExecutionRepository;
+import com.ars.api.domain.repository.TestScenarioRepository;
 import com.ars.api.dto.ExecutionView;
 import com.ars.api.web.ApiException;
 
@@ -33,6 +35,8 @@ public class ExecutionService {
     private final ExecutionEventService events;
     private final AuditService audit;
     private final WorkerClient workerClient;
+    private final TestScenarioRepository scenarioRepository;
+    private final DependencyObservationRepository observationRepository;
 
     public ExecutionService(
             ProjectRepository projectRepository,
@@ -41,7 +45,9 @@ public class ExecutionService {
             TestExecutionRepository executionRepository,
             ExecutionEventService events,
             AuditService audit,
-            WorkerClient workerClient) {
+            WorkerClient workerClient,
+            TestScenarioRepository scenarioRepository,
+            DependencyObservationRepository observationRepository) {
         this.projectRepository = projectRepository;
         this.screenRepository = screenRepository;
         this.environmentRepository = environmentRepository;
@@ -49,6 +55,8 @@ public class ExecutionService {
         this.events = events;
         this.audit = audit;
         this.workerClient = workerClient;
+        this.scenarioRepository = scenarioRepository;
+        this.observationRepository = observationRepository;
     }
 
     public ExecutionView start(Long projectId, Long screenId, ExecutionMode mode, String actor) {
@@ -91,24 +99,135 @@ public class ExecutionService {
                 com.ars.api.domain.enums.ExecutionEventType.INFO,
                 "Dispatching job to the browser worker.");
 
-        var payload = new com.ars.api.dto.worker.WorkerDiscoverJobPayload(
-                "discover",
-                execution.getId(),
-                project.getId(),
-                screen.getScreenCode(),
-                screen.getName(),
-                mode,
-                com.ars.api.dto.worker.WorkerEnvironmentPayload.from(legacyEnvironment),
-                reactEnvironment == null ? null
-                        : com.ars.api.dto.worker.WorkerEnvironmentPayload.from(reactEnvironment));
-
-        WorkerClient.DispatchOutcome outcome = workerClient.dispatchDiscover(payload);
+        WorkerClient.DispatchOutcome outcome;
+        if (mode == ExecutionMode.COMPARISON) {
+            var plan = resolveComparisonPlan(project.getId(), screen, execution.getId());
+            var planMap = new java.util.LinkedHashMap<String, Object>(plan.plan());
+            var comparisonPayload = new com.ars.api.dto.worker.WorkerComparisonJobPayload(
+                    "compare",
+                    execution.getId(),
+                    project.getId(),
+                    screen.getScreenCode(),
+                    screen.getName(),
+                    ExecutionMode.COMPARISON,
+                    planMap,
+                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(legacyEnvironment),
+                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(reactEnvironment),
+                    java.util.List.of());
+            outcome = workerClient.dispatchComparison(comparisonPayload);
+        } else {
+            var payload = new com.ars.api.dto.worker.WorkerDiscoverJobPayload(
+                    "discover",
+                    execution.getId(),
+                    project.getId(),
+                    screen.getScreenCode(),
+                    screen.getName(),
+                    mode,
+                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(legacyEnvironment),
+                    reactEnvironment == null ? null
+                            : com.ars.api.dto.worker.WorkerEnvironmentPayload.from(reactEnvironment));
+            outcome = workerClient.dispatchDiscover(payload);
+        }
 
         return switch (outcome.state()) {
             case QUEUED -> markQueued(execution, project, screen);
             case NOT_SUPPORTED -> markNotSupported(execution, project, screen, outcome, actor);
             case ERROR -> markWorkerError(execution, project, screen, outcome, actor);
         };
+    }
+
+    /**
+     * Comparison plan source, in priority order:
+     * 1) a human-APPROVED scenario for this screen;
+     * 2) a deterministic plan derived from the latest dependency observations;
+     * 3) refused honestly when no exploration data exists.
+     */
+    private ComparisonPlan resolveComparisonPlan(
+            Long projectId, ScreenDefinition screen, Long executionId) {
+        // 1) Approved scenario.
+        var approved = scenarioRepository
+                .findFirstByScreenIdAndStatusOrderByIdDesc(screen.getId(), "APPROVED");
+        if (approved.isPresent()) {
+            events.append(executionId,
+                    com.ars.api.domain.enums.ExecutionEventType.INFO,
+                    "Using the approved scenario '%s' as the comparison plan."
+                            .formatted(approved.get().getName()));
+            return new ComparisonPlan(approved.get().getPlan(), "APPROVED_SCENARIO");
+        }
+
+        // 2) Derive from the latest dependency observations of this screen.
+        var latestDiscovery = executionRepository
+                .findTop50ByProjectIdOrderByCreatedAtDesc(projectId)
+                .stream()
+                .filter(candidate -> candidate.getScreenId().equals(screen.getId())
+                        && candidate.getMode() == ExecutionMode.DISCOVERY)
+                .findFirst();
+        if (latestDiscovery.isPresent()) {
+            var observations = observationRepository
+                    .findByExecutionIdOrderByIdAsc(latestDiscovery.get().getId());
+            if (!observations.isEmpty()) {
+                java.util.List<java.util.Map<String, Object>> steps = new java.util.ArrayList<>();
+                java.util.Set<String> seen = new java.util.HashSet<>();
+                for (var observation : observations) {
+                    String key = observation.getSourceRef() + "|" + observation.getInteraction()
+                            + "|" + observation.getValue();
+                    if (!seen.add(key)) {
+                        continue;
+                    }
+                    var step = new java.util.LinkedHashMap<String, Object>();
+                    step.put("action", interactionToAction(observation.getInteraction()));
+                    step.put("target", observation.getSourceRef());
+                    if (observation.getValue() != null) {
+                        step.put("value", observation.getValue());
+                    }
+                    steps.add(step);
+                    // Assert the observed effect stays true in React.
+                    var assertion = new java.util.LinkedHashMap<String, Object>();
+                    switch (observation.getAttribute()) {
+                        case "enabled" -> assertion.put("action",
+                                "true".equals(observation.getAfterValue())
+                                        ? "assertEnabled"
+                                        : "assertDisabled");
+                        case "visible" -> assertion.put("action",
+                                "true".equals(observation.getAfterValue())
+                                        ? "assertVisible"
+                                        : "assertHidden");
+                        default -> assertion.put("action", "assertValue");
+                    }
+                    assertion.put("target", observation.getAffectedRef());
+                    steps.add(assertion);
+                }
+                var plan = new java.util.LinkedHashMap<String, Object>();
+                plan.put("scenarioName", "Derived comparison plan for %s"
+                        .formatted(screen.getScreenCode()));
+                plan.put("screen", screen.getScreenCode());
+                plan.put("description",
+                        "Auto-derived from Phase 3 dependency observations; every step is reverted.");
+                plan.put("steps", steps);
+                events.append(executionId,
+                        com.ars.api.domain.enums.ExecutionEventType.INFO,
+                        "No approved scenario found; the plan was derived deterministically "
+                                + "from %d dependency observation(s).".formatted(observations.size()));
+                return new ComparisonPlan(plan, "DERIVED_FROM_EXPLORATION");
+            }
+        }
+
+        throw ApiException.conflict("NO_PLAN_DATA",
+                "Comparison needs an approved scenario or a prior discovery run with "
+                        + "dependency observations for this screen.");
+    }
+
+    private String interactionToAction(String interaction) {
+        return switch (interaction) {
+            case "selectOption" -> "selectOption";
+            case "setCheckbox" -> "setCheckbox";
+            case "chooseRadio" -> "chooseRadio";
+            default -> throw ApiException.badRequest("INVALID_INTERACTION",
+                    "Unknown interaction: %s".formatted(interaction));
+        };
+    }
+
+    private record ComparisonPlan(java.util.Map<String, Object> plan, String source) {
     }
 
     private ExecutionView markQueued(TestExecution execution, Project project, ScreenDefinition screen) {

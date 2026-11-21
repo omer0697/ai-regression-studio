@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import { hasBrowserAutomation } from "../capabilities.js";
+import { ComparisonRunner } from "../comparison/comparison.js";
 import { DiscoverJobRunner } from "../runner.js";
 import { ExecutionReporter } from "../reporter.js";
 import type { BrowserLifecycle } from "../browser/lifecycle.js";
@@ -13,6 +14,7 @@ export function createJobRoutes(
   browser: BrowserLifecycle,
   credentials: CredentialStore,
   runner: DiscoverJobRunner,
+  comparisonRunner?: ComparisonRunner,
 ) {
   return async function jobRoutes(app: FastifyInstance): Promise<void> {
     /** Executions currently processed by this worker instance. */
@@ -40,7 +42,8 @@ export function createJobRoutes(
       const job = parsed.data;
 
       if (job.jobType === "execute") {
-        // Scenario execution and comparison land in Phase 5.
+        // Single-app scenario execution lands with Phase 5's comparison flow;
+        // the comparison job covers both apps.
         return await reply
           .code(501)
           .send({
@@ -48,21 +51,7 @@ export function createJobRoutes(
               code: "CAPABILITY_NOT_IMPLEMENTED",
               capability: "scenario-execution",
               plannedPhase: 5,
-              message: `Execute jobs (execution #${job.executionId}) are planned for Phase 5 with the differential comparison engine.`,
-            },
-          });
-      }
-
-      if (job.mode === "COMPARISON") {
-        // GWT↔React behavioral comparison is the Phase 5 differential engine.
-        return await reply
-          .code(501)
-          .send({
-            error: {
-              code: "CAPABILITY_NOT_IMPLEMENTED",
-              capability: "differential-comparison",
-              plannedPhase: 5,
-              message: `Comparison execution #${job.executionId} requires the differential engine planned for Phase 5; no partial result is produced.`,
+              message: `Execute jobs (execution #${job.executionId}) arrive with the Phase 5 comparison engine; use jobType 'compare'.`,
             },
           });
       }
@@ -99,7 +88,19 @@ export function createJobRoutes(
             config.internalToken,
             job.executionId,
           );
-          await runner.run(job, reporter);
+          if (job.jobType === "compare") {
+            if (!comparisonRunner) {
+              await reporter.status({
+                status: "FAILED",
+                errorCode: "COMPARISON_RUNNER_UNAVAILABLE",
+                statusMessage: "Comparison runner is not available in this build.",
+              });
+              return;
+            }
+            await comparisonRunner.run(job, reporter);
+          } else {
+            await runner.run(job, reporter);
+          }
         })
         .catch((error) => {
           console.error("[jobs] runner crashed:", error);

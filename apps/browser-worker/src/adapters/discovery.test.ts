@@ -68,7 +68,9 @@ describe("GwtAdapter — real Chromium against the GWT-like fixture", () => {
           element.elementType === "table" &&
           element.label?.includes("Sorgu Sonuçları"),
       );
-      expect(dataTable?.value).toBe("3x4"); // 1 header row + 2 data rows
+      expect(dataTable?.value?.startsWith("3x4 ##")).toBe(true);
+      expect(dataTable?.value).toContain("XYZ-9");
+      expect(dataTable?.options).toEqual(["Kod", "Tip", "Değer", "Durum"]);
       expect(byRefType("table").length).toBe(2);
 
       // Every record has a stable ref and a DOM path.
@@ -83,32 +85,37 @@ describe("GwtAdapter — real Chromium against the GWT-like fixture", () => {
   });
 });
 
-describe("ReactAdapter — real Chromium against the React-like fixture", () => {
-  it("discovers ant-form-item labels and semantic controls", async () => {
+describe("ReactAdapter — real Chromium against the defective React-like fixture", () => {
+  it("discovers ant-form-item labels and records the defective baseline honestly", async () => {
     const { browser, page } = await openFixture("react-kpy68.html");
     try {
       const adapter = new ReactAdapter();
       await adapter.waitForReady(page, 10_000);
       const elements = await adapter.discoverElements(page);
 
-      const codeField = elements.find((element) => element.value === "KPY-001");
+      const codeField = elements.find((element) => element.label === "Parametre Kodu");
       expect(codeField?.label).toBe("Parametre Kodu");
+
+      // Defect 5: the API-bound code field renders empty (GWT: KPY-001).
+      // The discovery normalizes empty values to null ("no value").
+      expect(codeField?.value).toBeNull();
 
       const disabledValue = elements.find((element) => element.label === "Parametre Değeri");
       expect(disabledValue?.enabled).toBe(false);
+
+      // Defect 1: the Açıklama textarea is missing entirely.
+      expect(elements.filter((element) => element.elementType === "textarea")).toHaveLength(0);
 
       // Ant Design renders buttons as [role=button] spans.
       expect(
         elements.filter((element) => element.elementType === "button").length,
       ).toBeGreaterThanOrEqual(3);
 
-      // The React fixture's Parametre Değeri field is populated (GWT's is
-      // disabled-and-empty by design) — the adapters record what IS there.
-      expect(disabledValue?.value).toBe("ABC-123");
-
       const table = elements.find((element) => element.elementType === "table");
       expect(table).toBeDefined();
-      expect(table?.value).toBe("3x4");
+      expect(table?.value?.startsWith("3x4 ##")).toBe(true);
+      expect(table?.value).toContain("XYZ-8");
+      expect(table?.options).toEqual(["Kod", "Tip", "Değer", "Durum"]);
     } finally {
       await browser.close();
     }

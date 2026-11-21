@@ -164,4 +164,36 @@ public class WorkerClient {
             return new DispatchOutcome(OutcomeState.ERROR, errorCode, detail);
         }
     }
+
+    /** Queues a Phase 5 comparison job (both apps + plan). */
+    public DispatchOutcome dispatchComparison(
+            com.ars.api.dto.worker.WorkerComparisonJobPayload payload) {
+        if (!isConfigured()) {
+            return DispatchOutcome.notSupported("WORKER_NOT_CONFIGURED",
+                    "Browser worker base URL is not configured (ARS_WORKER_BASE_URL).");
+        }
+        try {
+            try {
+                log.info("Comparison job payload: {}",
+                        objectMapper.writeValueAsString(payload));
+            } catch (com.fasterxml.jackson.core.JsonProcessingException debugEx) {
+                log.warn("Could not log comparison payload: {}", debugEx.getMessage());
+            }
+            return restClient.post()
+                    .uri("/api/jobs")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(payload)
+                    .exchange((request, response) -> {
+                        String body = response.getStatusCode().is2xxSuccessful()
+                                ? ""
+                                : StreamUtils.copyToString(response.getBody(), StandardCharsets.UTF_8);
+                        return classify(response.getStatusCode().value(), body);
+                    }, true);
+        } catch (RestClientException exception) {
+            log.warn("Browser worker unreachable: {}", exception.getMessage());
+            return DispatchOutcome.error("WORKER_UNAVAILABLE",
+                    "Browser worker could not be reached at "
+                            + properties.worker().baseUrl() + ".");
+        }
+    }
 }

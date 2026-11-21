@@ -194,6 +194,33 @@ export function useExecutionObservations(id: number) {
   });
 }
 
+export function useExecutionFindings(id: number) {
+  return useQuery({
+    queryKey: ["executions", id, "findings"] as const,
+    queryFn: () => api.listExecutionFindings(id),
+    enabled: Number.isFinite(id),
+    refetchInterval: (query) => (query.state.data?.length ? false : 5000),
+  });
+}
+
+export function useBugs(status?: string) {
+  return useQuery({
+    queryKey: ["bugs", status ?? "all"] as const,
+    queryFn: () => api.listBugs(status),
+  });
+}
+
+export function useUpdateBugStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: number; status: "CONFIRMED" | "DISMISSED" }) =>
+      api.updateBugStatus(id, status),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["bugs"] });
+    },
+  });
+}
+
 export function useAiStatus() {
   return useQuery({ queryKey: ["ai", "status"] as const, queryFn: () => api.getAiStatus() });
 }

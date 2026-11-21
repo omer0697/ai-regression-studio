@@ -70,6 +70,7 @@ const ACTIONS_REQUIRING_VALUE: ReadonlySet<string> = new Set([
 const ACTIONS_ALLOWING_VALUE: ReadonlySet<string> = new Set([
   "fill",
   "selectOption",
+  "setCheckbox",
   "chooseRadio",
   "assertValue",
   "assertText",
@@ -182,9 +183,42 @@ export type DiscoverJob = z.infer<typeof discoverJobSchema>;
 export type ExecuteJob = z.infer<typeof executeJobSchema>;
 export type WorkerJob = DiscoverJob | ExecuteJob;
 
+/** A GWT->React element pair used to align the two applications. */
+export const mappingPairSchema = z
+  .object({
+    legacyRef: z.string().max(64),
+    legacyLabel: z.string().max(300).nullable().optional(),
+    reactRef: z.string().max(64).nullable().optional(),
+    reactLabel: z.string().max(300).nullable().optional(),
+    confidence: z.number().min(0).max(1),
+    needsReview: z.boolean().optional(),
+  })
+  .strict();
+
+export type MappingPair = z.infer<typeof mappingPairSchema>;
+
+/** Phase 5: run an equivalent plan in both apps and compare behavior. */
+export const comparisonJobSchema = z
+  .object({
+    jobType: z.literal("compare"),
+    executionId: z.number().int().positive(),
+    projectId: z.number().int().positive(),
+    screenCode: z.string().min(1).max(64),
+    screenName: z.string().min(1).max(120),
+    mode: z.literal("COMPARISON"),
+    plan: scenarioPlanSchema,
+    legacyApp: environmentRefSchema,
+    reactApp: environmentRefSchema,
+    mapping: z.array(mappingPairSchema).max(300).optional(),
+  })
+  .strict();
+
+export type ComparisonJob = z.infer<typeof comparisonJobSchema>;
+
 export const workerJobSchema = z.discriminatedUnion("jobType", [
   discoverJobSchema,
   executeJobSchema,
+  comparisonJobSchema,
 ]);
 
 /** Structured error body the worker returns for unimplemented capabilities. */

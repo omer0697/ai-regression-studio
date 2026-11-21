@@ -80,6 +80,22 @@ export class ExecutionReporter {
     );
   }
 
+  async mapping(records: Array<Record<string, unknown>>) {
+    await this.withRetry(() =>
+      this.call("POST", `/api/internal/executions/${this.executionId}/mapping`, {
+        items: records,
+      }),
+    );
+  }
+
+  async findings(records: Array<Record<string, unknown>>) {
+    await this.withRetry(() =>
+      this.call("POST", `/api/internal/executions/${this.executionId}/findings`, {
+        items: records,
+      }),
+    );
+  }
+
   private async call(method: string, path: string, body: unknown) {
     const response = await fetch(`${this.apiBaseUrl}${path}`, {
       method,

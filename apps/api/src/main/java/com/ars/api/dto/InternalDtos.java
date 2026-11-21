@@ -68,6 +68,40 @@ public final class InternalDtos {
             List<@Valid DependencyObservationPayload> items) {
     }
 
+    public record ElementMappingPayload(
+            @NotBlank @Size(max = 64) String legacyRef,
+            @Size(max = 300) String legacyLabel,
+            @Size(max = 64) String reactRef,
+            @Size(max = 300) String reactLabel,
+            @NotNull Double confidence,
+            Boolean needsReview,
+            @NotBlank @Size(max = 32) String screenCode) {
+    }
+
+    public record InternalMappingRequest(
+            @NotNull @Size(min = 1, max = 300)
+            List<@Valid ElementMappingPayload> items) {
+    }
+
+    public record BugFindingPayload(
+            @NotBlank @Size(max = 40) String category,
+            @NotBlank @Size(max = 20) String severity,
+            @NotBlank @Size(max = 200) String title,
+            @Size(max = 64) String legacyRef,
+            @Size(max = 300) String legacyLabel,
+            @Size(max = 64) String reactRef,
+            @Size(max = 300) String reactLabel,
+            @Size(max = 40) String attribute,
+            @Size(max = 1000) String expectedBehavior,
+            @Size(max = 1000) String actualBehavior,
+            @Size(max = 32) String screenCode) {
+    }
+
+    public record InternalFindingsRequest(
+            @NotNull @Size(min = 1, max = 200)
+            List<@Valid BugFindingPayload> items) {
+    }
+
     public record InternalElementsRequest(
             @NotNull @Size(min = 1, max = 500, message = "At most 500 elements per batch.")
             List<@Valid DiscoveredElementPayload> items) {

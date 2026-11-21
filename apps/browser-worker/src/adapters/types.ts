@@ -7,6 +7,7 @@ export interface TargetEnvironment {
   appType: "LEGACY_GWT" | "REACT";
   baseUrl: string;
   authMethod: "NONE" | "TEST_ACCOUNT_FORM";
+  credentialReference?: string | null;
   loginUrl?: string | null;
   usernameSelector?: string | null;
   passwordSelector?: string | null;

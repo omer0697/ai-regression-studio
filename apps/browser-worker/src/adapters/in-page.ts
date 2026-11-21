@@ -247,7 +247,21 @@ function inPageDiscover(strategy: "gwt" | "react"): Array<Record<string, unknown
       const table = el as HTMLTableElement;
       const rows = table.rows ? table.rows.length : 0;
       const headerCells = table.tHead ? table.tHead.rows[0]?.cells.length ?? 0 : 0;
-      value = `${rows}x${headerCells}`;
+      // Content digest lets the comparison engine detect data differences;
+      // header cells become the matching signature for table pairing.
+      const digest: string[] = [];
+      for (let i = 0; i < table.rows.length && digest.length < 40; i++) {
+        const cells = Array.from(table.rows[i].cells)
+          .map((cell) => clip(cell.textContent) ?? "")
+          .join("|");
+        digest.push(cells);
+      }
+      value = clip(`${rows}x${headerCells} ## ${digest.join(" ;; ")}`);
+      options = headerCells
+        ? Array.from(table.tHead!.rows[0].cells)
+            .slice(0, 12)
+            .map((cell) => clip(cell.textContent) ?? "")
+        : null;
       const caption = clip(table.caption?.textContent);
       const label =
         caption ??
@@ -262,7 +276,9 @@ function inPageDiscover(strategy: "gwt" | "react"): Array<Record<string, unknown
         enabled: true,
         visible,
         required: null,
-        options: null,
+        options,
+        locatorCandidates: [],
+        name: null,
         domPath: domPath(el),
         confidence: label ? 0.75 : 0.4,
       });

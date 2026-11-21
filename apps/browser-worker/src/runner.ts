@@ -2,6 +2,7 @@ import type { DiscoverJob } from "@ars/test-schemas";
 
 import { adapterFor } from "./adapters/index.js";
 import type { BrowserLifecycle } from "./browser/lifecycle.js";
+import { performFormLogin } from "./browser/login.js";
 import type { CredentialStore } from "./credentials.js";
 import { DependencyExplorer } from "./exploration/explorer.js";
 import type { ExecutionReporter } from "./reporter.js";
@@ -201,38 +202,13 @@ export class DiscoverJobRunner {
     reporter: ExecutionReporter,
     timeoutMs: number,
   ): Promise<void> {
-    const reference = environment.credentialReference ?? "";
-    const credential = this.credentials.get(reference);
-    if (!credential) {
-      throw new Error(
-        `Credential reference '${reference}' not found in the worker credential store.`,
-      );
-    }
-    if (
-      !environment.loginUrl ||
-      !environment.usernameSelector ||
-      !environment.passwordSelector ||
-      !environment.submitSelector
-    ) {
-      throw new Error("TEST_ACCOUNT_FORM requires loginUrl and form selectors.");
-    }
-
-    await reporter.event("INFO", "Performing configured test-account form login.");
-    await page.goto(environment.loginUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-    await page.waitForSelector(environment.usernameSelector, { timeout: timeoutMs });
-    const loginPageUrl = page.url();
-
-    await page.fill(environment.usernameSelector, credential.username);
-    await page.fill(environment.passwordSelector, credential.password);
-    await page.click(environment.submitSelector);
-
-    // State-based wait: success means we leave the login page.
-    try {
-      await page.waitForURL((url) => url.toString() !== loginPageUrl, { timeout: timeoutMs });
-      await reporter.event("STEP", "Test-account login accepted by the application.");
-    } catch {
-      throw new Error("Login was rejected — the login form is still visible after submit.");
-    }
+    await performFormLogin(
+      page,
+      environment,
+      this.credentials.get(environment.credentialReference ?? ""),
+      (message) => reporter.event("INFO", message),
+      timeoutMs,
+    );
   }
 
   private collectDiagnostics(
