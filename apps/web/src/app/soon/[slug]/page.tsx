@@ -18,29 +18,6 @@ interface SectionInfo {
 }
 
 const SECTIONS: Record<string, SectionInfo> = {
-  "ai-discovery": {
-    title: "AI Keşif & Test",
-    phase: "Faz 3–4",
-    summary:
-      "Playwright ile GWT ekranındaki alanlar, butonlar, tablolar keşfedilir; DeepSeek test senaryoları önerir.",
-    bullets: [
-      "Gerçek tarayıcı oturumu ile GWT DOM incelemesi ve normalize edilmiş eleman kaydı",
-      "Sınırlı ve güvenli etkileşim keşfi (bağımlılık tespiti)",
-      "DeepSeek ile senaryo üretimi; JSON Schema ile doğrulama",
-      "Üretilen adımlar kapalı aksiyon sözlüğü ile politika kontrolünden geçirilir",
-    ],
-  },
-  scenarios: {
-    title: "Senaryo Kütüphanesi",
-    phase: "Faz 4",
-    summary:
-      "AI tarafından önerilen ve insan tarafından onaylanan senaryoların kalıcı kütüphanesi.",
-    bullets: [
-      "Senaryo kaydı, düzenleme ve insan onayı akışı",
-      "Ekran bazlı filtreleme ve risk etiketleri",
-      "Senaryo tekrar çalıştırılabilirliği",
-    ],
-  },
   comparison: {
     title: "GWT ↔ React Karşılaştırma",
     phase: "Faz 5",

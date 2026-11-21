@@ -63,6 +63,15 @@ app:
     access-key: ${ARS_MINIO_ACCESS_KEY:ars-minio}
     secret-key: ${ARS_MINIO_SECRET_KEY:ars-minio-secret}
     bucket: ${ARS_MINIO_BUCKET:ars-artifacts}
+  ai:
+    # OpenAI-compatible company-hosted DeepSeek adapter. Leave blank to keep the
+    # platform fully usable without AI; AI features then report
+    # AI_NOT_CONFIGURED honestly instead of faking results.
+    base-url: ${AI_BASE_URL:}
+    model: ${AI_MODEL:}
+    api-key: ${AI_API_KEY:}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:60}
+    max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:2048}
 
 logging:
   level:

@@ -186,7 +186,57 @@ export const api = {
     request<DiscoveredElementRecord[]>(`/executions/${id}/elements`),
   listExecutionObservations: (id: number) =>
     request<DependencyObservation[]>(`/executions/${id}/observations`),
+  getAiStatus: () =>
+    request<{
+      configured: boolean;
+      baseUrl: string | null;
+      model: string | null;
+      timeoutSeconds: number | null;
+      maxOutputTokens: number | null;
+      allowedActions: string[];
+      apiKeyPresent: boolean;
+    }>("/ai/status"),
+  proposeAiPlan: (projectId: number, screenId: number, command: string) =>
+    request<ScenarioInfo>(`/projects/${projectId}/screens/${screenId}/ai/plan`, {
+      method: "POST",
+      body: { command },
+    }),
+  analyzeExecution: (id: number) =>
+    request<{
+      id: number;
+      kind: string;
+      model: string | null;
+      status: string;
+      hypothesis: string | null;
+      output: Record<string, unknown> | null;
+    }>(`/executions/${id}/ai/analyze`, { method: "POST" }),
+  listScenarios: (projectId?: number) =>
+    request<ScenarioInfo[]>(
+      projectId ? `/scenarios?projectId=${projectId}` : "/scenarios",
+    ),
+  approveScenario: (id: number) =>
+    request<ScenarioInfo>(`/scenarios/${id}/approve`, { method: "POST" }),
+  rejectScenario: (id: number, reason?: string) =>
+    request<ScenarioInfo>(`/scenarios/${id}/reject`, {
+      method: "POST",
+      body: { reason: reason ?? null },
+    }),
 };
+
+export interface ScenarioInfo {
+  id: number;
+  projectId: number;
+  screenId: number;
+  name: string;
+  description: string | null;
+  source: string;
+  status: "PROPOSED" | "APPROVED" | "REJECTED" | "EXECUTED";
+  plan: Record<string, unknown>;
+  proposedBy: string | null;
+  approvedBy: string | null;
+  createdAt: string;
+  approvedAt: string | null;
+}
 
 /** Same-origin URL that streams artifact bytes with the session cookie. */
 export function artifactContentUrl(artifactId: number): string {

@@ -193,3 +193,46 @@ export function useExecutionObservations(id: number) {
     refetchInterval: (query) => (query.state.data?.length ? false : 5000),
   });
 }
+
+export function useAiStatus() {
+  return useQuery({ queryKey: ["ai", "status"] as const, queryFn: () => api.getAiStatus() });
+}
+
+export function useScenarios(projectId?: number) {
+  return useQuery({
+    queryKey: ["scenarios", projectId ?? "all"] as const,
+    queryFn: () => api.listScenarios(projectId),
+  });
+}
+
+export function useApproveScenario() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.approveScenario(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["scenarios"] });
+    },
+  });
+}
+
+export function useRejectScenario() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
+      api.rejectScenario(id, reason),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["scenarios"] });
+    },
+  });
+}
+
+export function useProposeAiPlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, screenId, command }: { projectId: number; screenId: number; command: string }) =>
+      api.proposeAiPlan(projectId, screenId, command),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["scenarios"] });
+    },
+  });
+}

@@ -17,7 +17,8 @@ public record AppProperties(
         Worker worker,
         Cors cors,
         Internal internal,
-        Storage storage) {
+        Storage storage,
+        Ai ai) {
 
     public record Seed(String adminUsername, String adminPassword) {
     }
@@ -42,6 +43,24 @@ public record AppProperties(
     public record Storage(String endpoint, String accessKey, String secretKey, String bucket) {
         public boolean enabled() {
             return endpoint != null && !endpoint.isBlank();
+        }
+    }
+
+    /**
+     * OpenAI-compatible AI provider (company-hosted DeepSeek). Unconfigured by
+     * default — the platform stays fully usable and AI features report
+     * AI_NOT_CONFIGURED instead of fabricating output.
+     */
+    public record Ai(
+            String baseUrl,
+            String model,
+            String apiKey,
+            Integer timeoutSeconds,
+            Integer maxOutputTokens) {
+        public boolean enabled() {
+            return baseUrl != null && !baseUrl.isBlank()
+                    && apiKey != null && !apiKey.isBlank()
+                    && model != null && !model.isBlank();
         }
     }
 }

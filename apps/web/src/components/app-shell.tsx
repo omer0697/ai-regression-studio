@@ -36,12 +36,12 @@ const PRIMARY_NAV: NavItem[] = [
 ];
 
 const PHASED_NAV: NavItem[] = [
-  { href: "/soon/ai-discovery", label: "AI Keşif & Test", icon: <IconSparkles />, phase: "F3–4" },
-  { href: "/soon/scenarios", label: "Senaryo Kütüphanesi", icon: <IconActivity />, phase: "F4" },
+  { href: "/ai-discovery", label: "AI Keşif & Test", icon: <IconSparkles /> },
+  { href: "/scenarios", label: "Senaryo Kütüphanesi", icon: <IconActivity /> },
+  { href: "/ai-config", label: "AI Ayarları", icon: <IconCpu /> },
   { href: "/soon/comparison", label: "GWT ↔ React", icon: <IconLayers />, phase: "F5" },
   { href: "/soon/pdf", label: "PDF Karşılaştırma", icon: <IconFileText />, phase: "F6" },
   { href: "/soon/bugs", label: "Hata Raporları", icon: <IconBug />, phase: "F5–7" },
-  { href: "/soon/ai-config", label: "AI Ayarları", icon: <IconCpu />, phase: "F4" },
   { href: "/soon/settings", label: "Ayarlar", icon: <IconSettings />, phase: "F8" },
 ];
 
