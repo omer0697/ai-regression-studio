@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api-client";
+import type { AiSettingsUpdate } from "@/lib/api-client";
 
 export const queryKeys = {
   dashboard: ["dashboard"] as const,
@@ -107,6 +108,18 @@ export function useCreateEnvironment(projectId: number) {
   });
 }
 
+export function useUpdateEnvironment(projectId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ envId, body }: { envId: number; body: Record<string, unknown> }) =>
+      api.updateEnvironment(projectId, envId, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.environments(projectId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
+    },
+  });
+}
+
 export function useDeleteEnvironment(projectId: number) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -122,6 +135,18 @@ export function useCreateScreen(projectId: number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: Record<string, unknown>) => api.createScreen(projectId, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.screens(projectId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
+    },
+  });
+}
+
+export function useUpdateScreen(projectId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ screenId, body }: { screenId: number; body: Record<string, unknown> }) =>
+      api.updateScreen(projectId, screenId, body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.screens(projectId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
@@ -223,6 +248,25 @@ export function useUpdateBugStatus() {
 
 export function useAiStatus() {
   return useQuery({ queryKey: ["ai", "status"] as const, queryFn: () => api.getAiStatus() });
+}
+
+export function useAiSettings() {
+  return useQuery({ queryKey: ["ai", "settings"] as const, queryFn: () => api.getAiSettings() });
+}
+
+export function useUpdateAiSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AiSettingsUpdate) => api.updateAiSettings(body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["ai", "settings"] });
+      void queryClient.invalidateQueries({ queryKey: ["ai", "status"] });
+    },
+  });
+}
+
+export function useTestAiSettings() {
+  return useMutation({ mutationFn: () => api.testAiSettings() });
 }
 
 export function useScenarios(projectId?: number) {

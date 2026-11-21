@@ -40,10 +40,27 @@ public record AppProperties(
         }
     }
 
-    /** S3-compatible evidence storage (MinIO). */
-    public record Storage(String endpoint, String accessKey, String secretKey, String bucket) {
+    /**
+     * Evidence artifact storage.
+     *
+     * <p>Two modes: {@code s3} (MinIO/S3-compatible, for shared deployments)
+     * and {@code filesystem} (a plain directory, for no-Docker local runs).
+     * The SQLite profile defaults to {@code filesystem}.</p>
+     */
+    public record Storage(
+            String mode,
+            String endpoint,
+            String accessKey,
+            String secretKey,
+            String bucket,
+            String dir) {
+        public boolean filesystemMode() {
+            return "filesystem".equalsIgnoreCase(mode == null ? "" : mode.trim());
+        }
+
+        /** S3/MinIO client is only built when the endpoint is configured. */
         public boolean enabled() {
-            return endpoint != null && !endpoint.isBlank();
+            return !filesystemMode() && endpoint != null && !endpoint.isBlank();
         }
     }
 

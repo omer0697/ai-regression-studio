@@ -5,14 +5,18 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
+  IconChat,
   IconChevronRight,
-  IconCpu,
+  IconEdit,
+  IconPlay,
   IconTrash,
 } from "@/components/icons";
-import { PageHeader, StatCard } from "@/components/page-parts";
+import { EmptyState, PageHeader, StatCard } from "@/components/page-parts";
 import {
   CreateEnvironmentDialog,
   CreateScreenDialog,
+  EditEnvironmentDialog,
+  EditScreenDialog,
 } from "@/components/project-forms";
 import { AppTypeBadge, StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +27,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Select } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -37,7 +43,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   useDeleteEnvironment,
   useDeleteProject,
@@ -48,16 +53,21 @@ import {
   useScreens,
   useStartExecution,
 } from "@/lib/api-hooks";
-import { MODE_LABELS, formatDate } from "@/lib/utils";
+import { MODE_DESCRIPTIONS, MODE_LABELS, formatDate } from "@/lib/utils";
 import { RequirementsPanel } from "@/components/requirements-panel";
-import type { EnvironmentConfig } from "@ars/shared-contracts";
+import { RequirementsMatrix } from "@/components/requirements-matrix";
+import type { EnvironmentConfig, ScreenDefinition } from "@ars/shared-contracts";
+
+const RUN_MODES = ["DISCOVERY", "COMPARISON", "COMBINATION"] as const;
 
 function EnvironmentCard({
   environment,
+  onEdit,
   onDelete,
 }: {
   environment: EnvironmentConfig;
-  onDelete: (envId: number) => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   return (
     <Card>
@@ -67,16 +77,22 @@ function EnvironmentCard({
             <CardTitle>{environment.displayName}</CardTitle>
             <AppTypeBadge appType={environment.appType} />
           </div>
-          <CardDescription>{environment.baseUrl}</CardDescription>
+          <CardDescription className="font-mono">{environment.baseUrl}</CardDescription>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Ortamı sil"
-          onClick={() => onDelete(environment.id)}
-        >
-          <IconTrash />
-        </Button>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="icon" aria-label="Ortamı düzenle" onClick={onEdit}>
+            <IconEdit />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Ortamı sil"
+            className="text-danger hover:bg-danger/10 hover:text-danger"
+            onClick={onDelete}
+          >
+            <IconTrash />
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
         <p className="text-muted-foreground">
@@ -91,6 +107,19 @@ function EnvironmentCard({
         </p>
         <p className="text-muted-foreground">
           Zaman aşımı: <span className="text-foreground">{environment.browserTimeoutMs} ms</span>
+        </p>
+        <p className="text-muted-foreground">
+          Keşif limiti:{" "}
+          <span className="text-foreground">
+            {environment.explorationMaxInteractions} etkileşim × {environment.explorationMaxOptions}{" "}
+            seçenek
+          </span>
+        </p>
+        <p className="text-muted-foreground">
+          Ekran görüntüsü:{" "}
+          <span className="text-foreground">
+            {environment.screenshotEnabled ? "açık" : "kapalı"}
+          </span>
         </p>
         <p className="text-muted-foreground sm:col-span-2">
           İzinli alan adları:{" "}
@@ -111,11 +140,41 @@ function EnvironmentCard({
   );
 }
 
+function QuickStep({
+  index,
+  title,
+  description,
+  href,
+  linkLabel,
+}: {
+  index: number;
+  title: string;
+  description: string;
+  href?: string;
+  linkLabel?: string;
+}) {
+  return (
+    <li className="flex gap-3">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+        {index}
+      </span>
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+        {href && linkLabel ? (
+          <Link className="mt-1 inline-block text-xs text-primary hover:underline" href={href}>
+            {linkLabel} →
+          </Link>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
   const projectId = Number(params?.id);
   const router = useRouter();
-  const queryClient = useQueryClient();
 
   const { data: project, isLoading } = useProject(projectId);
   const { data: environments } = useEnvironments(projectId);
@@ -127,9 +186,19 @@ export default function ProjectDetailPage() {
   const deleteScreen = useDeleteScreen(projectId);
   const startExecution = useStartExecution(projectId);
 
+  const [editingEnvironment, setEditingEnvironment] = useState<EnvironmentConfig | null>(null);
+  const [editingScreen, setEditingScreen] = useState<ScreenDefinition | null>(null);
+
   const [selectedScreenId, setSelectedScreenId] = useState<string>("");
   const [selectedMode, setSelectedMode] = useState<string>("DISCOVERY");
   const [startError, setStartError] = useState<string | null>(null);
+
+  const availableScreens = (screens ?? []).filter((screen) => screen.active);
+  const [reqScreenCode, setReqScreenCode] = useState<string>("");
+  const activeReqScreenCode =
+    (screens ?? []).some((screen) => screen.screenCode === reqScreenCode)
+      ? reqScreenCode
+      : ((screens ?? [])[0]?.screenCode ?? "");
 
   const onStartExecution = async () => {
     setStartError(null);
@@ -174,7 +243,8 @@ export default function ProjectDetailPage() {
     return <div className="h-40 animate-pulse rounded-xl bg-surface-2/50" />;
   }
 
-  const availableScreens = (screens ?? []).filter((screen) => screen.active);
+  const hasGwt = (environments ?? []).some((env) => env.appType === "LEGACY_GWT");
+  const hasReact = (environments ?? []).some((env) => env.appType === "REACT");
 
   return (
     <div className="flex flex-col gap-6">
@@ -186,10 +256,19 @@ export default function ProjectDetailPage() {
             : `Test ortamı: ${project.environmentName}`
         }
         actions={
-          <Button variant="ghost" onClick={() => void onDeleteProject()}>
-            <IconTrash />
-            Projeyi Pasife Al
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-subtle bg-surface-2 px-4 text-sm font-medium hover:bg-surface-2/70"
+              href="/chat"
+            >
+              <IconChat />
+              Proje Sohbeti
+            </Link>
+            <Button variant="ghost" onClick={() => void onDeleteProject()}>
+              <IconTrash />
+              Projeyi Pasife Al
+            </Button>
+          </div>
         }
       />
 
@@ -198,6 +277,7 @@ export default function ProjectDetailPage() {
           <TabsTrigger value="overview">Genel</TabsTrigger>
           <TabsTrigger value="environments">Ortamlar</TabsTrigger>
           <TabsTrigger value="screens">Ekranlar</TabsTrigger>
+          <TabsTrigger value="requirements">Gereksinimler</TabsTrigger>
           <TabsTrigger value="executions">Çalıştırmalar</TabsTrigger>
         </TabsList>
 
@@ -209,22 +289,112 @@ export default function ProjectDetailPage() {
           </div>
 
           <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0">
-              <CardTitle>Faz 1 Kapsamı</CardTitle>
-              <IconCpu className="text-muted-foreground" />
+            <CardHeader>
+              <CardTitle>Nasıl ilerlenir?</CardTitle>
+              <CardDescription>
+                Dört adımda eski ↔ yeni uygulama karşılaştırması; platform hazırlanmayan
+                adımları asla &quot;geçti&quot; olarak göstermez.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              Bu sürümde proje/ortam yapılandırması ve çalıştırma kaydı kullanılabilir.
-              Gerçek tarayıcı otomasyonu, GWT keşfi ve GWT ↔ React karşılaştırması sırasıyla
-              2–5. Fazlarda devreye alınacak. Platform, hazırlanmayan adımları{" "}
-              <StatusBadge status="NOT_SUPPORTED" /> olarak raporlar; asla &quot;geçti&quot; demez.
+            <CardContent>
+              <ol className="flex flex-col gap-4">
+                <QuickStep
+                  index={1}
+                  title="Ortamları tanımlayın"
+                  description="Ortamlar sekmesinden eski (GWT) ve yeni (React) uygulamanın adreslerini ekleyin. Yerelde çalışan bir uygulamayı da (örn. http://localhost:…) test edebilirsiniz."
+                />
+                <QuickStep
+                  index={2}
+                  title="Ekran ekleyin"
+                  description="Ekranlar sekmesinden test edilecek ekranı kaydedin (örn. KPY68). Ekran kodu sonradan değişmez, diğer bilgiler düzenlenebilir."
+                />
+                <QuickStep
+                  index={3}
+                  title="Çalıştırma başlatın"
+                  description="Çalıştırmalar sekmesinden Keşif, Karşılaştırma veya Kombinasyon modunu seçip başlatın; ilerlemeyi canlı izleyin."
+                />
+                <QuickStep
+                  index={4}
+                  title="Farkları inceleyin"
+                  description="Tespit edilen davranış farkları, kanıt ekran görüntüleriyle birlikte Hata Raporları sayfasında listelenir; onaylama insan kararıdır."
+                  href="/bugs"
+                  linkLabel="Hata Raporları"
+                />
+              </ol>
             </CardContent>
           </Card>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="border-primary/30">
+              <CardHeader className="flex-row items-start gap-3 space-y-0">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                  <IconChat />
+                </span>
+                <div>
+                  <CardTitle>Sorunuz mu var?</CardTitle>
+                  <CardDescription>
+                    Proje sohbetinde bulguları, gereksinim kapsamını ve çalıştırma
+                    durumunu sorabilirsiniz. AI yapılandırılmadığında da aynı gerçek
+                    verilerle yanıt alırsınız — asla uydurma değil.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Link
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                  href="/chat"
+                >
+                  Sohbeti aç
+                  <IconChevronRight />
+                </Link>
+              </CardContent>
+            </Card>
+
+            <Card
+              className={
+                hasGwt && hasReact
+                  ? "border-success/40"
+                  : "border-warning/40"
+              }
+            >
+              <CardHeader>
+                <CardTitle>Ortam Hazırlığı</CardTitle>
+                <CardDescription>
+                  Karşılaştırma ve Kombinasyon modları için eski ve yeni uygulamanın
+                  ikisi de tanımlı olmalıdır.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2 text-sm">
+                <p className="flex items-center justify-between rounded-lg border border-border-subtle bg-surface-2/40 px-3 py-2">
+                  <span>Eski (GWT) ortamı</span>
+                  {hasGwt ? (
+                    <span className="font-medium text-success">Tanımlı ✓</span>
+                  ) : (
+                    <span className="font-medium text-warning">Eksik</span>
+                  )}
+                </p>
+                <p className="flex items-center justify-between rounded-lg border border-border-subtle bg-surface-2/40 px-3 py-2">
+                  <span>Yeni (React) ortamı</span>
+                  {hasReact ? (
+                    <span className="font-medium text-success">Tanımlı ✓</span>
+                  ) : (
+                    <span className="font-medium text-warning">Eksik</span>
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="environments" className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Uygulama Ortamları</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold">Uygulama Ortamları</h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Test edilecek uygulamaların adresleri ve güvenli giriş ayarları.
+                Değişiklik için karttaki düzenleme simgesini kullanın.
+              </p>
+            </div>
             <CreateEnvironmentDialog projectId={projectId} />
           </div>
 
@@ -234,30 +404,36 @@ export default function ProjectDetailPage() {
                 <EnvironmentCard
                   key={environment.id}
                   environment={environment}
-                  onDelete={(envId) => {
-                    if (confirm("Ortam silinsin mi?")) {
-                      void deleteEnvironment.mutateAsync(envId).then(() =>
-                        queryClient.invalidateQueries({ queryKey: ["projects", projectId] }),
-                      );
+                  onEdit={() => setEditingEnvironment(environment)}
+                  onDelete={() => {
+                    if (
+                      confirm(
+                        `"${environment.displayName}" ortamı silinsin mi? Bu işlem geri alınamaz.`,
+                      )
+                    ) {
+                      void deleteEnvironment.mutateAsync(environment.id);
                     }
                   }}
                 />
               ))}
             </div>
           ) : (
-            <Card>
-              <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                Henüz ortam tanımlı değil. GWT ve React test adreslerini tanımlamak için
-                &quot;Ortam Ekle&quot;yi kullanın.
-              </CardContent>
-            </Card>
+            <EmptyState
+              title="Henüz ortam tanımlı değil"
+              description='Karşılaştırma için bir GWT (eski) ve bir React (yeni) ortamı ekleyin. Yerelde çalışan uygulamanızın adresini (örn. http://localhost:9100/...) "Temel URL" alanına girebilirsiniz.'
+              action={<CreateEnvironmentDialog projectId={projectId} />}
+            />
           )}
         </TabsContent>
 
         <TabsContent value="screens" className="flex flex-col gap-4">
-          <RequirementsPanel projectId={projectId} screenCode="KPY68" />
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Ekran Kaydı</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold">Ekran Kaydı</h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Test edilecek ekranlar. Ekran kodu sabittir; ad, rotalar ve notlar düzenlenebilir.
+              </p>
+            </div>
             <CreateScreenDialog projectId={projectId} />
           </div>
 
@@ -278,37 +454,97 @@ export default function ProjectDetailPage() {
                     <TableCell className="font-mono text-xs font-medium text-primary">
                       {screen.screenCode}
                     </TableCell>
-                    <TableCell>{screen.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="max-w-48">
+                      <span className="block truncate">{screen.name}</span>
+                      {screen.navigationNotes ? (
+                        <span className="block max-w-48 truncate text-xs text-muted-foreground">
+                          {screen.navigationNotes}
+                        </span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
                       {screen.legacyRoute ?? "—"}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="font-mono text-xs text-muted-foreground">
                       {screen.reactRoute ?? "—"}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Ekranı sil"
-                        onClick={() => {
-                          if (confirm("Ekran silinsin mi?")) {
-                            void deleteScreen.mutateAsync(screen.id);
-                          }
-                        }}
-                      >
-                        <IconTrash />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Ekranı düzenle"
+                          onClick={() => setEditingScreen(screen)}
+                        >
+                          <IconEdit />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Ekranı sil"
+                          className="text-danger hover:bg-danger/10 hover:text-danger"
+                          onClick={() => {
+                            if (
+                              confirm(
+                                `"${screen.screenCode}" ekranı silinsin mi? Bu işlem geri alınamaz.`,
+                              )
+                            ) {
+                              void deleteScreen.mutateAsync(screen.id);
+                            }
+                          }}
+                        >
+                          <IconTrash />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           ) : (
-            <Card>
-              <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                Henüz ekran yok. Örn. KPY68 ekranını ekleyin.
-              </CardContent>
-            </Card>
+            <EmptyState
+              title="Henüz ekran yok"
+              description='Test edilecek ekranı ekleyin (örn. ekran kodu "KPY68", ad "Parametre Tanımları").'
+              action={<CreateScreenDialog projectId={projectId} />}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="requirements" className="flex flex-col gap-4">
+          {screens && screens.length > 0 ? (
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                <Label htmlFor="req-screen">Ekran seçin</Label>
+                <Select
+                  id="req-screen"
+                  className="max-w-64"
+                  value={activeReqScreenCode}
+                  onChange={(event) => setReqScreenCode(event.target.value)}
+                >
+                  {screens.map((screen) => (
+                    <option key={screen.id} value={screen.screenCode}>
+                      {screen.screenCode} — {screen.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <RequirementsMatrix
+                projectId={projectId}
+                screens={screens.map((screen) => ({
+                  id: screen.id,
+                  screenCode: screen.screenCode,
+                  name: screen.name,
+                }))}
+                screenCode={activeReqScreenCode}
+                onScreenChange={setReqScreenCode}
+              />
+              <RequirementsPanel projectId={projectId} screenCode={activeReqScreenCode} />
+            </>
+          ) : (
+            <EmptyState
+              title="Gereksinim görüntülemek için önce ekran ekleyin"
+              description="Gereksinimler ekran bazlı takip edilir. Ekranlar sekmesinden en az bir ekran ekleyin."
+            />
           )}
         </TabsContent>
 
@@ -317,19 +553,17 @@ export default function ProjectDetailPage() {
             <CardHeader>
               <CardTitle>Test Çalıştır</CardTitle>
               <CardDescription>
-                Seçili ekran için keşif ya da karşılaştırma çalıştırması başlatın.
-                Sonuç, faz durumuna göre dürüst biçimde raporlanır.
+                Seçili ekran için keşif, karşılaştırma ya da kombinasyon çalıştırması
+                başlatın. Sonuçlar dürüst biçimde raporlanır — hazırlanmayan adım
+                asla &quot;geçti&quot; denmez.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3">
+            <CardContent className="flex flex-col gap-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium" htmlFor="exec-screen">
-                    Ekran
-                  </label>
-                  <select
+                  <Label htmlFor="exec-screen">Ekran</Label>
+                  <Select
                     id="exec-screen"
-                    className="h-9 rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm"
                     value={selectedScreenId}
                     onChange={(event) => setSelectedScreenId(event.target.value)}
                   >
@@ -339,24 +573,27 @@ export default function ProjectDetailPage() {
                         {screen.screenCode} — {screen.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium" htmlFor="exec-mode">
-                    Mod
-                  </label>
-                  <select
+                  <Label htmlFor="exec-mode">Mod</Label>
+                  <Select
                     id="exec-mode"
-                    className="h-9 rounded-lg border border-border-subtle bg-surface-2 px-3 text-sm"
                     value={selectedMode}
                     onChange={(event) => setSelectedMode(event.target.value)}
                   >
-                    <option value="DISCOVERY">Keşif (GWT)</option>
-                    <option value="COMPARISON">Karşılaştırma (GWT ↔ React)</option>
-                    <option value="COMBINATION">Kombinasyon (tüm alan kombinasyonları)</option>
-                  </select>
+                    {RUN_MODES.map((mode) => (
+                      <option key={mode} value={mode}>
+                        {MODE_LABELS[mode]}
+                      </option>
+                    ))}
+                  </Select>
                 </div>
               </div>
+
+              <p className="rounded-lg border border-border-subtle bg-surface-2/40 px-3 py-2 text-xs text-muted-foreground">
+                {MODE_DESCRIPTIONS[selectedMode]}
+              </p>
 
               {startError ? (
                 <p className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -369,8 +606,8 @@ export default function ProjectDetailPage() {
                 onClick={() => void onStartExecution()}
                 disabled={startExecution.isPending || availableScreens.length === 0}
               >
+                <IconPlay />
                 Çalıştır
-                <IconChevronRight />
               </Button>
             </CardContent>
           </Card>
@@ -418,14 +655,24 @@ export default function ProjectDetailPage() {
               </TableBody>
             </Table>
           ) : (
-            <Card>
-              <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                Bu proje için henüz çalıştırma yok.
-              </CardContent>
-            </Card>
+            <EmptyState
+              title="Bu proje için henüz çalıştırma yok"
+              description="Yukarıdaki formdan bir ekran ve mod seçip çalıştırın. İlerlemeyi çalıştırma detayında canlı izleyebilirsiniz."
+            />
           )}
         </TabsContent>
       </Tabs>
+
+      <EditEnvironmentDialog
+        projectId={projectId}
+        environment={editingEnvironment}
+        onClose={() => setEditingEnvironment(null)}
+      />
+      <EditScreenDialog
+        projectId={projectId}
+        screen={editingScreen}
+        onClose={() => setEditingScreen(null)}
+      />
     </div>
   );
 }

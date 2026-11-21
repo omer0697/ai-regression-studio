@@ -1,0 +1,4 @@
+# Early-boot hooks: ensure file-based SQLite databases have a writable
+# parent directory before Flyway connects (SPRING_PROFILES_ACTIVE=sqlite).
+org.springframework.boot.env.EnvironmentPostProcessor=\
+  com.ars.api.config.SqliteDataDirectoryInitializer

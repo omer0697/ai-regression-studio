@@ -8,6 +8,9 @@ out/
 target/
 *.tsbuildinfo
 
+# Local runtime data (SQLite profile + filesystem artifact storage)
+apps/api/data/
+
 # Environment / secrets
 .env
 .env.*

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 import { IconAlert, IconCheck, IconPlay } from "@/components/icons";
@@ -282,42 +283,66 @@ export default function ExecutionDetailPage() {
 
           {findings && findings.length > 0 ? (
             <Card className="border-danger/40">
-              <CardHeader>
-                <CardTitle>Tespit Edilen Davranış Farkları</CardTitle>
-                <CardDescription>
-                  {findings.length} kanıt destekli bulgu — GWT beklenen davranışı,
-                  React gerçekleşen davranışı temsil eder. Detaylar Hata Raporları
-                  sayfasında.
-                </CardDescription>
+              <CardHeader className="flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle>Tespit Edilen Davranış Farkları</CardTitle>
+                  <CardDescription>
+                    {findings.length} kanıt destekli bulgu — GWT beklenen davranışı,
+                    React gerçekleşen davranışı temsil eder. Onaylama/yok sayma Hata
+                    Raporları sayfasında yapılır.
+                  </CardDescription>
+                </div>
+                <Link className="text-sm text-primary hover:underline" href="/bugs">
+                  Hata Raporları →
+                </Link>
               </CardHeader>
-              <CardContent className="flex flex-col gap-2">
+              <CardContent className="flex flex-col gap-3">
                 {findings.map((finding) => (
                   <div
                     key={finding.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border-subtle bg-surface-2/40 px-3 py-2"
+                    className={`flex flex-col gap-2 rounded-lg border border-border-subtle px-3 py-2.5 ${
+                      finding.severity === "HIGH"
+                        ? "border-l-4 border-l-danger bg-danger/5"
+                        : finding.severity === "MEDIUM"
+                          ? "border-l-4 border-l-warning"
+                          : "border-l-4 border-l-border-subtle"
+                    }`}
                   >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">
-                        <span className="font-mono text-xs text-primary">
-                          {finding.bugCode}
-                        </span>{" "}
-                        {finding.title}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-md bg-primary/15 px-2 py-0.5 font-mono text-xs font-semibold text-primary">
+                        {finding.bugCode}
+                      </span>
+                      <Badge
+                        tone={
+                          finding.severity === "HIGH"
+                            ? "danger"
+                            : finding.severity === "MEDIUM"
+                              ? "warning"
+                              : "muted"
+                        }
+                      >
+                        {finding.severity === "HIGH"
+                          ? "Yüksek"
+                          : finding.severity === "MEDIUM"
+                            ? "Orta"
+                            : "Düşük"}
+                      </Badge>
+                      <p className="min-w-0 flex-1 text-sm font-medium">{finding.title}</p>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <p className="rounded-md border border-success/30 bg-success/5 px-2.5 py-1.5 text-xs">
+                        <span className="font-semibold text-success">GWT beklenen:</span>{" "}
+                        <span className="text-foreground">
+                          {finding.expectedBehavior ?? "Kayıt yok."}
+                        </span>
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {finding.expectedBehavior} · {finding.actualBehavior}
+                      <p className="rounded-md border border-danger/30 bg-danger/5 px-2.5 py-1.5 text-xs">
+                        <span className="font-semibold text-danger">React gerçekleşen:</span>{" "}
+                        <span className="text-foreground">
+                          {finding.actualBehavior ?? "Kayıt yok."}
+                        </span>
                       </p>
                     </div>
-                    <Badge
-                      tone={
-                        finding.severity === "HIGH"
-                          ? "danger"
-                          : finding.severity === "MEDIUM"
-                            ? "warning"
-                            : "muted"
-                      }
-                    >
-                      {finding.severity}
-                    </Badge>
                   </div>
                 ))}
               </CardContent>

@@ -62,6 +62,21 @@
       <scope>runtime</scope>
     </dependency>
 
+    <!-- Embedded local mode (SPRING_PROFILES_ACTIVE=sqlite): zero-setup
+         database for machines without a PostgreSQL server. -->
+    <dependency>
+      <groupId>org.xerial</groupId>
+      <artifactId>sqlite-jdbc</artifactId>
+      <version>3.50.3.0</version>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- Community-maintained SQLite dialect for Hibernate ORM 6.6. -->
+    <dependency>
+      <groupId>org.hibernate.orm</groupId>
+      <artifactId>hibernate-community-dialects</artifactId>
+      <version>${hibernate.version}</version>
+    </dependency>
+
     <dependency>
       <groupId>org.springdoc</groupId>
       <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>

@@ -1,0 +1,37 @@
+# Embedded local mode: zero external services (no PostgreSQL, no Docker).
+# Activate with SPRING_PROFILES_ACTIVE=sqlite.
+#
+# The database is a single file (default: ./data/ars.sqlite next to the
+# working directory; override with ARS_SQLITE_FILE). Evidence artifacts are
+# stored on the local filesystem (ARS_STORAGE_MODE=filesystem) instead of
+# MinIO/S3.
+
+spring:
+  datasource:
+    url: ${ARS_SQLITE_FILE:jdbc:sqlite:./data/ars.sqlite}
+    username: ars
+    password: ars
+    hikari:
+      # SQLite serializes writes; a small pool avoids lock contention.
+      maximum-pool-size: 4
+      data-source-properties:
+        # Enforce FK constraints (cascading deletes rely on this).
+        foreign_keys: true
+
+  jpa:
+    hibernate:
+      # Schema is owned by the SQLite Flyway script below; Hibernate
+      # validation is tuned for PostgreSQL types, so it is disabled here.
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: com.ars.api.config.ArsSqliteDialect
+
+  flyway:
+    locations: classpath:db/sqlite
+
+app:
+  storage:
+    # Local filesystem evidence storage instead of S3/MinIO.
+    mode: ${ARS_STORAGE_MODE:filesystem}
+    dir: ${ARS_STORAGE_DIR:./data/artifacts}

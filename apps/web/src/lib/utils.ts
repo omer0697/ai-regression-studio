@@ -72,4 +72,14 @@ export function explainWorkerError(code: string | null | undefined): string | nu
 export const MODE_LABELS: Record<string, string> = {
   DISCOVERY: "Keşif (GWT)",
   COMPARISON: "Karşılaştırma (GWT ↔ React)",
+  COMBINATION: "Kombinasyon (tüm alanlar)",
+};
+
+export const MODE_DESCRIPTIONS: Record<string, string> = {
+  DISCOVERY:
+    "Eski (GWT) uygulamanın ekranını güvenli biçimde keşfeder: alanları listeler, etkileşim bağımlılıklarını gözlemler. Yeni uygulama gerekmez.",
+  COMPARISON:
+    "Onaylı senaryoyu eski (GWT) ve yeni (React) uygulamada sırayla yürütür ve yalnızca davranış farklarını kanıtla raporlar.",
+  COMBINATION:
+    "Keşfedilen tüm alanların değer kombinasyonlarını sınırlı bütçe içinde her iki uygulamada dener; bağımlılık hatalarını ortaya çıkarır. GWT + React ortamlarının ikisi de gerekir.",
 };

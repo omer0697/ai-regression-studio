@@ -5,6 +5,59 @@ komut çıktılarıyla desteklenir; doğrulanmamış hiçbir şey "tamamlandı" 
 
 ---
 
+## Faz 9 — Yerel Çalıştırma & Yönetim Deneyimi ✅ (21 Kasım 2026)
+
+### Tamamlananlar
+
+- **UI/UX sadeleştirme:** yan menü mantıksal gruplara ayrıldı (çift "GWT ↔ React"
+  bağlantısı kaldırıldı), mobil yatay gezinme eklendi (önceden mobilde menü yoktu),
+  panelde başlangıç rehberi, ortam hazırlık durumu ve sohbet kısayolları.
+- **Ortam & ekran düzenleme:** PUT uçları mevcuttu ama UI'da yoktu — dolu gelen
+  "Ortamı/Ekranı Düzenle" penceleri (ekran kodu ve uygulama tipi bilinçli olarak
+  sabit; API davranışıyla uyumlu). Canlı doğrulandı.
+- **Hata Raporları yeniden tasarımı:** kart görünümü — ağırlık renk şeridi
+  (yüksek = kırmızı zemin, üstte), bulgu kodu rozeti, yeşil "Eski (GWT) beklenen"
+  ↔ kırmızı "Yeni (React) gerçekleşen" panelleri, anahtar-değer formatında
+  yeniden üretim, kanıt listesi. Çalıştırma detayındaki bulgular aynı formatta.
+- **Sohbet yeniden tasarımı:** tam yükseklikli sohbet düzeni, yazıyor animasyonu,
+  hızlı komutlar, AI/deterministik durum rozeti, boş durumda yerel uygulama
+  rehberi; sunucunun satır sonlu yanıtları başlık + madde + birleşen paragraf
+  olarak biçimleniyor.
+- **Gömülü SQLite profili** (`SPRING_PROFILES_ACTIVE=sqlite`): Docker/PostgreSQL
+  gerektirmeyen tek dosyalık veritabanı. Konsolide Flyway betiği
+  (`db/sqlite/V1` — PG taramasının alt klasörü yanlışlıkla bulmasını önlemek
+  için `db/migration` dışında), Hibernate community dialect'i + özel
+  `ArsSqliteDialect` (JSON→text; ISO-8601 metin zaman damgaları — topluluk
+  dialect'inin epoch-millis yaz / getTimestamp ok tutarsızlığı
+  "Error parsing time stamp" üretiyordu, `SqliteIsoTextTimestampJdbcType` ile
+  giderildi) ve veritabanı klasörünü açılışta oluşturan
+  `EnvironmentPostProcessor`.
+- **Dosya sistemi kanıt deposu** (`ARS_STORAGE_MODE=filesystem`): MinIO yerine
+  yerel klasör; sqlite profiliyle birlikte varsayılan. Anahtar-değer çiftleri
+  korunarak MinIO ve filesystem aynı arayüz arkasında.
+- **AI Ayarları artık ekrandan yönetilebilir:** `ai_provider_setting` tablosu
+  (Flyway V9 / sqlite V1), `GET/PUT /ai/settings` + `POST /ai/settings/test`
+  (ADMIN), etkili yapılandırma çözümlemesi (ekran satırı → `AI_*` ortam
+  değişkeni yedeği; `source` alanıyla şeffaf). Anahtar yalnızca yazılır;
+  hiçbir yanıtta geri döndürülmez. `AiClient` ayarları çağrı başına çözer —
+  değişiklik yeniden başlatma gerektirmez. `AI_TIMEOUT_SECONDS` artık gerçekten
+  okuma zaman aşımına bağlı (önceden hesaplanıp kullanılmıyordu).
+- **Docker'sız kurulum dokümanı:** `docs/setup-local.md` — adım adım komutlar,
+  beklenen çıktılar, doğrulamalar ve sorun giderme tablosu (AI uyumlu format).
+
+### Doğrulama
+
+- `mvn -B package` → BUILD SUCCESS, **37 Java testi** (AI ayar hizmeti ve
+  controller eklendi; hiçbiri kırmızıya dönmedi)
+- SQLite profili canlı: Flyway SQLite'ta `V1` uygulandı → giriş `200`
+  (önce "Error parsing time stamp" → ISO-8601 tipiyle çözüldü), `/api/projects`
+  okuma, AI ayarı `PUT` → `source=DATABASE`, bağlantı testi dürüst `ok:false`
+  (`localhost:9999` sağlayıcısı yok), DB içeriği `node:sqlite` ile doğrulandı
+- Web: `tsc --noEmit` + `eslint` temiz (yalnız dokunulmayan bir dosyadaki eski
+  uyarı), 15 vitest geçti; yeni sayfalar tarayıcıda Playwright ile dolaşıldı
+
+---
+
 ## Faz 8 — Hardening ✅ (21 Kasım 2026)
 
 ### Tamamlananlar

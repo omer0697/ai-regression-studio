@@ -1,7 +1,11 @@
 package com.ars.api.service;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -21,14 +25,21 @@ import io.minio.errors.InternalException;
 import io.minio.errors.InvalidResponseException;
 import io.minio.errors.ServerException;
 import io.minio.errors.XmlParserException;
-import io.minio.messages.ErrorResponse;
 
-import java.io.IOException;
 import java.security.GeneralSecurityException;
 
 /**
- * S3-compatible evidence storage backed by MinIO. Binary artifacts
- * (screenshots, traces, logs) live in object storage — never in PostgreSQL.
+ * Evidence artifact storage with two interchangeable backends:
+ *
+ * <ul>
+ *   <li>{@code s3} — MinIO/S3-compatible object storage (shared deployments).</li>
+ *   <li>{@code filesystem} — a plain directory on the local disk
+ *       ({@code ARS_STORAGE_DIR}, default {@code ./data/artifacts}). This is
+ *       the zero-Docker local mode used together with the {@code sqlite}
+ *       profile.</li>
+ * </ul>
+ *
+ * <p>Binary artifacts never live in the SQL database in either mode.</p>
  */
 @Service
 public class ArtifactStorageService {
@@ -50,17 +61,25 @@ public class ArtifactStorageService {
     }
 
     public boolean enabled() {
-        return client != null;
+        return filesystemMode() || client != null;
+    }
+
+    public boolean filesystemMode() {
+        return properties.storage().filesystemMode();
     }
 
     /** Uploads bytes and returns the storage key. */
     public String store(String executionKey, String fileName, String contentType, byte[] bytes)
             throws StorageUnavailableException {
+        String key = "executions/%s/%s-%s".formatted(executionKey, UUID.randomUUID(), fileName);
+        if (filesystemMode()) {
+            storeOnFilesystem(key, bytes);
+            return key;
+        }
         if (!enabled()) {
             throw new StorageUnavailableException(
-                    "Artifact storage is not configured (ARS_MINIO_ENDPOINT is blank).");
+                    "Artifact storage is not configured (ARS_STORAGE_MODE / ARS_MINIO_ENDPOINT).");
         }
-        String key = "executions/%s/%s-%s".formatted(executionKey, UUID.randomUUID(), fileName);
         try {
             ensureBucket();
             try (InputStream stream = new ByteArrayInputStream(bytes)) {
@@ -81,6 +100,9 @@ public class ArtifactStorageService {
     }
 
     public InputStream retrieve(String key) throws StorageUnavailableException {
+        if (filesystemMode()) {
+            return retrieveFromFilesystem(key);
+        }
         if (!enabled()) {
             throw new StorageUnavailableException("Artifact storage is not configured.");
         }
@@ -93,6 +115,42 @@ public class ArtifactStorageService {
                 | InvalidResponseException | ServerException | XmlParserException
                 | IOException | GeneralSecurityException exception) {
             throw new StorageUnavailableException("Artifact could not be retrieved.");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // filesystem backend
+    // ------------------------------------------------------------------
+
+    private Path resolveFilesystemKey(String key) {
+        // Defense-in-depth: reject traversal attempts in keys.
+        if (key == null || key.isBlank() || key.contains("..") || key.startsWith("/")
+                || key.contains("\\")) {
+            throw new IllegalArgumentException("Invalid artifact key.");
+        }
+        return Path.of(properties.storage().dir()).resolve(key);
+    }
+
+    private void storeOnFilesystem(String key, byte[] bytes) throws StorageUnavailableException {
+        try {
+            Path target = resolveFilesystemKey(key);
+            Files.createDirectories(target.getParent());
+            Files.copy(new ByteArrayInputStream(bytes), target, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException | IllegalArgumentException exception) {
+            log.error("Filesystem artifact upload failed for {}: {}", key, exception.getMessage());
+            throw new StorageUnavailableException("Local artifact directory rejected the upload.");
+        }
+    }
+
+    private InputStream retrieveFromFilesystem(String key) throws StorageUnavailableException {
+        try {
+            Path source = resolveFilesystemKey(key);
+            if (!Files.isRegularFile(source)) {
+                throw new StorageUnavailableException("Artifact file is missing.");
+            }
+            return Files.newInputStream(source);
+        } catch (IOException | IllegalArgumentException exception) {
+            throw new StorageUnavailableException("Artifact could not be read from disk.");
         }
     }
 
@@ -111,7 +169,7 @@ public class ArtifactStorageService {
         bucketVerified = true;
     }
 
-    /** Raised when object storage is unavailable; never masked as success. */
+    /** Raised when artifact storage is unavailable; never masked as success. */
     public static class StorageUnavailableException extends Exception {
 
         public StorageUnavailableException(String message) {

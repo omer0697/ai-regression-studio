@@ -42,7 +42,7 @@ export function isTerminalExecutionStatus(status: ExecutionStatus): boolean {
 }
 
 /** What an execution does. */
-export const EXECUTION_MODES = ["DISCOVERY", "COMPARISON"] as const;
+export const EXECUTION_MODES = ["DISCOVERY", "COMPARISON", "COMBINATION"] as const;
 export type ExecutionMode = (typeof EXECUTION_MODES)[number];
 
 /** Execution event types streamed over SSE. */
@@ -101,6 +101,10 @@ export interface EnvironmentConfig {
   allowedActions: string[];
   prohibitedActions: string[];
   browserTimeoutMs: number;
+  /** Budget for safe interactive exploration (0 = disabled). */
+  explorationMaxInteractions: number;
+  /** Max options tried per interaction during exploration. */
+  explorationMaxOptions: number;
   screenshotEnabled: boolean;
   createdAt: string;
 }

@@ -11,7 +11,6 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
-import com.ars.api.config.AppProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -20,61 +19,51 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * endpoint. Vision is never assumed: prompts contain sanitized DOM/element
  * snapshots only. When AI is not configured the caller receives an honest
  * {@link AiUnavailableException} — output is never fabricated.
+ *
+ * <p>The configuration is resolved per call from {@link AiSettingsService}
+ * (UI-managed row first, AI_* environment variables as fallback), so changes
+ * made from the AI Ayarları screen take effect without a restart.</p>
  */
 @Service
 public class AiClient {
 
     private static final Logger log = LoggerFactory.getLogger(AiClient.class);
 
-    private final AppProperties properties;
+    private final AiSettingsService settings;
     private final ObjectMapper objectMapper;
-    private final RestClient restClient;
 
-    public AiClient(AppProperties properties, ObjectMapper objectMapper) {
-        this.properties = properties;
+    /** Cached per unique (baseUrl, apiKey) pair; rebuilt when settings change. */
+    private volatile RestClient cachedClient;
+    private volatile String cachedClientKey;
+
+    public AiClient(AiSettingsService settings, ObjectMapper objectMapper) {
+        this.settings = settings;
         this.objectMapper = objectMapper;
-        if (properties.ai().enabled()) {
-            var httpClient = java.net.http.HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(5))
-                    .build();
-            var requestFactory = new JdkClientHttpRequestFactory(httpClient);
-            this.restClient = RestClient.builder()
-                    .baseUrl(properties.ai().baseUrl())
-                    .requestFactory(requestFactory)
-                    .defaultHeader("Authorization", "Bearer " + properties.ai().apiKey())
-                    .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
-                    .build();
-        } else {
-            this.restClient = null;
-        }
     }
 
+    /** True when a usable configuration is present (UI row or environment). */
     public boolean enabled() {
-        return restClient != null;
+        return settings.effective().configured();
     }
 
     /** Completes a chat with a system and a user prompt; returns the content. */
     public String complete(String systemPrompt, String userPrompt) throws AiUnavailableException {
-        if (!enabled()) {
+        AiSettingsService.EffectiveAiConfig config = settings.effective();
+        if (!config.configured()) {
             throw new AiUnavailableException("AI provider is not configured.");
         }
-        int timeoutSeconds = properties.ai().timeoutSeconds() == null
-                ? 60
-                : properties.ai().timeoutSeconds();
-        int maxTokens = properties.ai().maxOutputTokens() == null
-                ? 2048
-                : properties.ai().maxOutputTokens();
 
         Map<String, Object> body = Map.of(
-                "model", properties.ai().model(),
+                "model", config.model(),
                 "temperature", 0,
-                "max_tokens", maxTokens,
+                "max_tokens", config.maxOutputTokens(),
                 "messages", List.of(
                         Map.of("role", "system", "content", systemPrompt),
                         Map.of("role", "user", "content", userPrompt)));
 
         try {
-            String response = restClient.post()
+            String response = restClientFor(config)
+                    .post()
                     .uri("/chat/completions")
                     .body(body)
                     .retrieve()
@@ -91,6 +80,42 @@ public class AiClient {
             log.warn("AI call failed: {}", exception.getMessage());
             throw new AiUnavailableException(
                     "AI provider call failed: %s".formatted(exception.getMessage()));
+        }
+    }
+
+    /**
+     * Sends a minimal ping prompt against the current effective settings.
+     * Returns the provider's reply; throws {@link AiUnavailableException}
+     * with the concrete reason when the provider cannot be reached.
+     */
+    public String testConnection() throws AiUnavailableException {
+        return complete(
+                "You are a connectivity probe. Reply with the single word: OK.",
+                "ping");
+    }
+
+    private RestClient restClientFor(AiSettingsService.EffectiveAiConfig config) {
+        String key = "%s|%s|%s".formatted(config.baseUrl(), config.apiKey(), config.timeoutSeconds());
+        RestClient current = cachedClient;
+        if (current != null && key.equals(cachedClientKey)) {
+            return current;
+        }
+        synchronized (this) {
+            if (cachedClient == null || !key.equals(cachedClientKey)) {
+                var httpClient = java.net.http.HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(5))
+                        .build();
+                var requestFactory = new JdkClientHttpRequestFactory(httpClient);
+                requestFactory.setReadTimeout(Duration.ofSeconds(config.timeoutSeconds()));
+                cachedClient = RestClient.builder()
+                        .baseUrl(config.baseUrl())
+                        .requestFactory(requestFactory)
+                        .defaultHeader("Authorization", "Bearer " + config.apiKey())
+                        .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                        .build();
+                cachedClientKey = key;
+            }
+            return cachedClient;
         }
     }
 

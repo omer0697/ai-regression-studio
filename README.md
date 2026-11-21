@@ -30,14 +30,44 @@ Ayrıntılı tasarım için `docs/architecture.md` dosyasına bakın.
 | Bileşen | Sürüm | Not |
 | --- | --- | --- |
 | Node.js | ≥ 20.9 (22 LTS önerilir) | web + worker |
-| Docker Desktop | güncel | PostgreSQL, MinIO, Java derlemesi |
-| JDK 21 + Maven 3.9 | *opsiyonel* | Yerelde Java yoksa derleme Docker ile yapılır (aşağıda) |
+| JDK 21 + Maven 3.9 | güncel | API; yerelde yoksa derleme Docker ile yapılır (aşağıda) |
+| Docker Desktop | güncel | **Yalnız** tam yığın konteyner kurulumu ve entegrasyon testleri için; yerel çalıştırma için gerekmez |
 | Git | güncel | sürüm kontrolü |
 
-> Windows notu: Bu geliştirme ortamında yerelde Java/Maven yoktu; tüm Java derleme ve testleri
-> `maven:3.9-eclipse-temurin-21` imajıyla Docker üzerinden çalıştırıldı ve doğrulandı.
+> Docker'sız, hiçbir dış servis gerektirmeyen kurulum için
+> **`docs/setup-local.md`** dosyasını okuyun: gömülü **SQLite** veritabanı
+> (`SPRING_PROFILES_ACTIVE=sqlite`) ve dosya sistemi tabanlı kanıt deposu
+> (`ARS_STORAGE_MODE=filesystem`) ile üç terminal komutuyla çalışır.
 
 ## Hızlı Başlangıç
+
+### Yol 1 — Docker'sız yerel kurulum (önerilen; ayrıntı: `docs/setup-local.md`)
+
+```powershell
+npm install                 # monorepo kökünde, ilk kez
+npm run build               # packages + worker derlemesi
+
+# Terminal 1 — API (gömülü SQLite + dosya tabanlı kanıt deposu)
+cd apps/api
+$env:SPRING_PROFILES_ACTIVE="sqlite"
+mvn spring-boot:run
+
+# Terminal 2 — worker (opsiyonel; gerçek tarayıcı testi için)
+npx playwright install chromium
+$env:WORKER_API_BASE_URL="http://localhost:8080"
+$env:WORKER_INTERNAL_TOKEN="ars-dev-internal-token"
+$env:WORKER_CREDENTIALS_FILE="apps/browser-worker/fixtures/credentials.example.json"
+node apps/browser-worker/dist/index.js
+
+# Terminal 3 — panel
+npm run dev:web             # http://localhost:3000
+```
+
+Kendi PostgreSQL sunucunuz varsa Terminal 1'de profil yerine
+`ARS_DATASOURCE_URL` verin; ayrıntılar ve doğrulama adımları kurulum
+dokümanındadır.
+
+### Yol 2 — Docker tabanlı kurulum (tam yığın / altyapı)
 
 ### 1) Altyapıyı kaldırın
 
@@ -122,11 +152,16 @@ docker compose -f docker-compose.yml -f docker-compose.full.yml up -d --build
 
 | Değişken | Varsayılan | Açıklama |
 | --- | --- | --- |
-| `ARS_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/ars` | PostgreSQL bağlantısı |
-| `ARS_DATASOURCE_USERNAME` / `ARS_DATASOURCE_PASSWORD` | `ars` / `ars` | Veritabanı kimliği |
+| `SPRING_PROFILES_ACTIVE` | *(boş)* | `sqlite` = gömülü tek dosyalık veritabanı + dosya tabanlı kanıt deposu; hiçbir dış servis gerekmez (bkz. `docs/setup-local.md`) |
+| `ARS_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/ars` | PostgreSQL bağlantısı (`sqlite` profili aktifken yerine `ARS_SQLITE_FILE` geçer) |
+| `ARS_SQLITE_FILE` | `jdbc:sqlite:./data/ars.sqlite` | SQLite profilinde veritabanı dosyası |
+| `ARS_DATASOURCE_USERNAME` / `ARS_DATASOURCE_PASSWORD` | `ars` / `ars` | PostgreSQL kimliği |
 | `ARS_SEED_ADMIN_USERNAME` / `ARS_SEED_ADMIN_PASSWORD` | `admin` / `admin123!` | İlk yönetici (yalnız ilk açılış) |
 | `ARS_WORKER_BASE_URL` | *(boş)* | Boşsa platform ayakta kalır; çalıştırmalar `WORKER_NOT_CONFIGURED` ile dürüstçe sonuçlanır |
-| `ARS_WEB_ORIGINS` | `http://localhost:3000` | Yalnız doğrudan (proxy'siz) erişim için CORS |
+| `ARS_STORAGE_MODE` | `s3` | `s3` (MinIO) veya `filesystem` (yerel klasör; sqlite profiliyle birlikte varsayılan) |
+| `ARS_STORAGE_DIR` | `./data/artifacts` | `filesystem` modunda kanıt klasörü |
+| `ARS_MINIO_ENDPOINT` / `ARS_MINIO_ACCESS_KEY` / `ARS_MINIO_SECRET_KEY` / `ARS_MINIO_BUCKET` | bkz. yml | S3 modu için MinIO ayarları |
+| `ARS_WEB_ORIGINS` | `http://localhost:*` | Yalnız doğrudan (proxy'siz) erişim için CORS |
 | `ARS_API_PORT` | `8080` | HTTP portu |
 
 ### Web (`apps/web`)
@@ -143,7 +178,7 @@ docker compose -f docker-compose.yml -f docker-compose.full.yml up -d --build
 | `WORKER_PORT` | `9100` | HTTP portu |
 | `WORKER_HOST` | `0.0.0.0` | Bağlanacak arayüz |
 
-### AI (Faz 4 — şimdiden planlanan isimler)
+### AI (Faz 4)
 
 ```text
 AI_BASE_URL=           # şirket içi DeepSeek uç noktası
@@ -153,7 +188,12 @@ AI_TIMEOUT_SECONDS=
 AI_MAX_OUTPUT_TOKENS=
 ```
 
-AI yapılandırılmadığında platform çalışmaya devam eder; AI destekli adımlar açıkça `NOT_SUPPORTED`/`AI_NOT_CONFIGURED` olarak raporlanır.
+Bu değişkenler hâlâ çalışır; ayrıca **AI Ayarları ekranından** sağlayıcı
+artık yönetilebilir (`ai_provider_setting` tablosu, ekran ayarları ortam
+değişkenlerinin yerine geçer, yeniden başlatma gerekmez; anahtar yalnızca
+yazılır, hiçbir yanıtta geri döndürülmez). AI hiç yapılandırılmadığında
+platform çalışmaya devam eder; AI destekli adımlar açıkça
+`NOT_SUPPORTED`/`AI_NOT_CONFIGURED` olarak raporlanır.
 
 ## Testleri Çalıştırma
 
@@ -184,6 +224,7 @@ docker run --rm -v "${PWD}\apps\api:/app" -v ars-maven-cache:/root/.m2 `
 | 6 — Document Workflows | PDFBox yapısal PDF karşılaştırma, sentetik PDF doğrulaması, imza/şifreleme dürüst durumu | ✅ |
 | 7 — Reporting | Özet/kırılım raporları, doğrulanmamış kapsam bölümü, JSON + PDF dışa aktarma | ✅ |
 | 8 — Hardening | Rate limiting, imza/şifreleme dürüst durumu, UTF-8 derleme, dokümantasyon | ✅ |
+| 9 — Local Experience | Docker'sız SQLite profili, filesystem kanıt deposu, ortam/ekran düzenleme, hata kartları, sohbet yeniden tasarımı, ekrandan AI ayar yönetimi, kurulum dokümanı | ✅ |
 
 Ayrıntılı durum: `docs/progress.md`.
 

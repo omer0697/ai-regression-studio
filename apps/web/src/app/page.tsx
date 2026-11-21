@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { IconChat, IconChevronRight } from "@/components/icons";
 import {
   Card,
   CardContent,
@@ -23,6 +24,76 @@ import { Badge } from "@/components/ui/badge";
 import { useDashboard } from "@/lib/api-hooks";
 import { MODE_LABELS, formatDate } from "@/lib/utils";
 
+const CAPABILITY_LABELS: Record<string, string> = {
+  browserAutomation: "Tarayıcı otomasyonu",
+  elementDiscovery: "Eleman keşfi",
+  screenshot: "Ekran görüntüsü",
+  traceRecording: "Trace kaydı",
+  networkObservation: "Ağ gözlemi",
+};
+
+function OnboardingCard() {
+  const steps = [
+    {
+      title: "Proje oluşturun",
+      description: "Her proje bir migration kapsamıdır (örn. KAP GWT → React).",
+      href: "/projects",
+      linkLabel: "Projeler",
+    },
+    {
+      title: "Ortamları tanımlayın",
+      description:
+        "Proje detayında eski (GWT) ve yeni (React) uygulamanın adreslerini ekleyin; yerelde çalışan uygulamayı da test edebilirsiniz.",
+    },
+    {
+      title: "Ekran ekleyip çalıştırın",
+      description:
+        "Hedef ekranı kaydedin, Keşif / Karşılaştırma / Kombinasyon modunda çalıştırın.",
+    },
+    {
+      title: "Farkları inceleyin",
+      description:
+        "Tespit edilen hatalar kanıtlarıyla Hata Raporları sayfasında listelenir.",
+      href: "/bugs",
+      linkLabel: "Hata Raporları",
+    },
+  ];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Başlangıç Rehberi</CardTitle>
+        <CardDescription>
+          Dört adımda ilk regresyon karşılaştırmanızı çalıştırın.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ol className="flex flex-col gap-4">
+          {steps.map((step, index) => (
+            <li key={step.title} className="flex gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+                {index + 1}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{step.title}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{step.description}</p>
+                {step.href && step.linkLabel ? (
+                  <Link
+                    className="mt-1 inline-block text-xs text-primary hover:underline"
+                    href={step.href}
+                  >
+                    {step.linkLabel} →
+                  </Link>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function DashboardPage() {
   const { data, isLoading, isError } = useDashboard();
 
@@ -31,6 +102,15 @@ export default function DashboardPage() {
       <PageHeader
         title="Panel"
         description="Migration projelerinin regresyon test durumunu tek ekrandan takip edin."
+        actions={
+          <Link
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-subtle bg-surface-2 px-4 text-sm font-medium hover:bg-surface-2/70"
+            href="/chat"
+          >
+            <IconChat />
+            Proje Sohbeti
+          </Link>
+        }
       />
 
       {isError ? (
@@ -63,18 +143,25 @@ export default function DashboardPage() {
             />
           </div>
 
+          {data.totalProjects === 0 ? <OnboardingCard /> : null}
+
           <Card>
-            <CardHeader>
-              <CardTitle>Worker Yetenekleri</CardTitle>
-              <CardDescription>
-                Platform, henüz devreye alınmamış yetenekleri asla &quot;çalıştı&quot; olarak
-                göstermez. Tarayıcı otomasyonu 2. Fazda geliyor.
-              </CardDescription>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>Worker Yetenekleri</CardTitle>
+                <CardDescription>
+                  Platform, devreye alınmamış yetenekleri asla &quot;çalıştı&quot; olarak
+                  göstermez; tarayıcı otomasyonu gerçek Chromium ile çalışır.
+                </CardDescription>
+              </div>
+              <Badge tone={data.worker.reachable ? "success" : "warning"}>
+                {data.worker.reachable ? "Erişilebilir" : "Erişilemiyor"}
+              </Badge>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
               {Object.entries(data.worker.capabilities).map(([capability, enabled]) => (
                 <Badge key={capability} tone={enabled ? "success" : "muted"}>
-                  {capability}: {enabled ? "hazır" : "hayır"}
+                  {CAPABILITY_LABELS[capability] ?? capability}: {enabled ? "hazır" : "hayır"}
                 </Badge>
               ))}
               {Object.keys(data.worker.capabilities).length === 0 ? (
@@ -100,7 +187,11 @@ export default function DashboardPage() {
                     <Link className="text-primary hover:underline" href="/projects">
                       proje detayından
                     </Link>{" "}
-                    test başlatabilirsiniz.
+                    test başlatabilirsiniz. Sorularınız için{" "}
+                    <Link className="text-primary hover:underline" href="/chat">
+                      Proje Sohbeti
+                    </Link>{" "}
+                    her zaman açık.
                   </>
                 }
               />
@@ -133,10 +224,11 @@ export default function DashboardPage() {
                       </TableCell>
                       <TableCell>
                         <Link
-                          className="text-sm text-primary hover:underline"
+                          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
                           href={`/executions/${execution.id}`}
                         >
                           Detay
+                          <IconChevronRight width={14} height={14} />
                         </Link>
                       </TableCell>
                     </TableRow>

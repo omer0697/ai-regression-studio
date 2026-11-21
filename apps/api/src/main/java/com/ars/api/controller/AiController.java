@@ -10,12 +10,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.ars.api.config.AppProperties;
 import com.ars.api.domain.entity.TestScenario;
 import com.ars.api.domain.repository.TestExecutionRepository;
 import com.ars.api.service.AiAnalysisService;
 import com.ars.api.service.AiClient;
 import com.ars.api.service.AiPlanService;
+import com.ars.api.service.AiSettingsService;
 import com.ars.api.service.ScenarioPlanParser;
 import com.ars.api.service.ScenarioService;
 import com.ars.api.web.ApiException;
@@ -30,40 +30,45 @@ import jakarta.validation.constraints.Size;
 @Tag(name = "AI", description = "AI provider status, planning and failure analysis.")
 public class AiController {
 
-    private final AppProperties properties;
     private final AiClient aiClient;
+    private final AiSettingsService settingsService;
     private final AiPlanService planService;
     private final AiAnalysisService analysisService;
     private final ScenarioService scenarioService;
     private final TestExecutionRepository executionRepository;
 
     public AiController(
-            AppProperties properties,
             AiClient aiClient,
+            AiSettingsService settingsService,
             AiPlanService planService,
             AiAnalysisService analysisService,
             ScenarioService scenarioService,
             TestExecutionRepository executionRepository) {
-        this.properties = properties;
         this.aiClient = aiClient;
+        this.settingsService = settingsService;
         this.planService = planService;
         this.analysisService = analysisService;
         this.scenarioService = scenarioService;
         this.executionRepository = executionRepository;
     }
 
-    /** Configuration status — the API key itself is never exposed. */
+    /**
+     * Configuration status — the API key itself is never exposed. Reports the
+     * effective configuration: UI-managed row first, AI_* environment
+     * variables as fallback (see {@code source}).
+     */
     @GetMapping("/ai/status")
     public Map<String, Object> status() {
+        AiSettingsService.EffectiveAiConfig config = settingsService.effective();
         Map<String, Object> status = new LinkedHashMap<>();
-        status.put("configured", aiClient.enabled());
-        status.put("baseUrl", properties.ai().baseUrl());
-        status.put("model", properties.ai().model());
-        status.put("timeoutSeconds", properties.ai().timeoutSeconds());
-        status.put("maxOutputTokens", properties.ai().maxOutputTokens());
+        status.put("configured", config.configured());
+        status.put("source", config.source());
+        status.put("baseUrl", config.baseUrl());
+        status.put("model", config.model());
+        status.put("timeoutSeconds", config.timeoutSeconds());
+        status.put("maxOutputTokens", config.maxOutputTokens());
         status.put("allowedActions", ScenarioPlanParser.SAFE_ACTIONS);
-        status.put("apiKeyPresent", properties.ai().apiKey() != null
-                && !properties.ai().apiKey().isBlank());
+        status.put("apiKeyPresent", config.apiKey() != null && !config.apiKey().isBlank());
         return status;
     }
 

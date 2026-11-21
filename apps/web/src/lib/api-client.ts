@@ -190,6 +190,7 @@ export const api = {
   getAiStatus: () =>
     request<{
       configured: boolean;
+      source: "DATABASE" | "ENV";
       baseUrl: string | null;
       model: string | null;
       timeoutSeconds: number | null;
@@ -197,6 +198,13 @@ export const api = {
       allowedActions: string[];
       apiKeyPresent: boolean;
     }>("/ai/status"),
+  getAiSettings: () => request<AiSettingsInfo>("/ai/settings"),
+  updateAiSettings: (body: AiSettingsUpdate) =>
+    request<AiSettingsInfo>("/ai/settings", { method: "PUT", body }),
+  testAiSettings: () =>
+    request<{ ok: boolean; detail: string; model: string | null }>("/ai/settings/test", {
+      method: "POST",
+    }),
   proposeAiPlan: (projectId: number, screenId: number, command: string) =>
     request<ScenarioInfo>(`/projects/${projectId}/screens/${screenId}/ai/plan`, {
       method: "POST",
@@ -311,6 +319,28 @@ export interface ChatReply {
   role: "USER" | "ASSISTANT";
   content: string;
   createdAt: string;
+}
+
+export interface AiSettingsInfo {
+  source: "DATABASE" | "ENV";
+  configured: boolean;
+  enabled: boolean;
+  baseUrl: string | null;
+  model: string | null;
+  timeoutSeconds: number;
+  maxOutputTokens: number;
+  apiKeyPresent: boolean;
+  updatedAt: string | null;
+}
+
+export interface AiSettingsUpdate {
+  enabled: boolean;
+  baseUrl?: string;
+  model?: string;
+  /** Write-only: blank keeps the previously stored key. */
+  apiKey?: string;
+  timeoutSeconds?: number;
+  maxOutputTokens?: number;
 }
 
 /** Standalone multipart PDF comparison (fetch-based, CSRF-aware). */
