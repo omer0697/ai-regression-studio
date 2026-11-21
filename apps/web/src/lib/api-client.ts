@@ -55,7 +55,7 @@ interface RequestOptions {
   body?: unknown;
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function request<T>(path: string, options: RequestOptions = {}, retryOnCsrf = true): Promise<T> {
   const method = options.method ?? "GET";
   const headers: Record<string, string> = { Accept: "application/json" };
 
@@ -89,6 +89,18 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   if (!response.ok) {
+    // Self-healing CSRF: a stale/missing token (e.g. browser had the page open
+    // across an API restart) is repaired by fetching a fresh cookie once and
+    // retrying the same mutation.
+    const csrfRejected = response.status === 403 && method !== "GET";
+    if (csrfRejected && retryOnCsrf) {
+      try {
+        await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
+      } catch {
+        // ignore — fall through to the thrown error
+      }
+      return request<T>(path, options, false);
+    }
     throw new ApiError(
       response.status,
       envelope.code ?? `HTTP_${response.status}`,
