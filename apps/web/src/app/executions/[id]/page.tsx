@@ -30,7 +30,7 @@ import {
   useExecutionObservations,
   useStartExecution,
 } from "@/lib/api-hooks";
-import { artifactContentUrl } from "@/lib/api-client";
+import { artifactContentUrl, API_BASE } from "@/lib/api-client";
 import { useExecutionStream } from "@/lib/execution-stream";
 import {
   MODE_LABELS,
@@ -84,6 +84,7 @@ export default function ExecutionDetailPage() {
 
   // Prefer the fresher stream status while it is connected.
   const status = stream.connected && stream.status ? stream.status : execution?.status;
+  const reportBase = `${API_BASE}/executions/${executionId}`;
 
   const workerExplanation = explainWorkerError(execution?.errorCode ?? null);
 
@@ -116,9 +117,27 @@ export default function ExecutionDetailPage() {
         }
         actions={
           execution ? (
-            <Button variant="secondary" onClick={() => void onRerun()} disabled={startExecution.isPending}>
-              Yeniden Çalıştır
-            </Button>
+            <div className="flex items-center gap-2">
+              <a
+                className="inline-flex h-9 items-center rounded-lg border border-border-subtle bg-surface-2 px-4 text-sm font-medium hover:bg-surface-2/70"
+                href={`${reportBase}/report`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Rapor (JSON)
+              </a>
+              <a
+                className="inline-flex h-9 items-center rounded-lg border border-border-subtle bg-surface-2 px-4 text-sm font-medium hover:bg-surface-2/70"
+                href={`${reportBase}/report.pdf`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Rapor (PDF)
+              </a>
+              <Button variant="secondary" onClick={() => void onRerun()} disabled={startExecution.isPending}>
+                Yeniden Çalıştır
+              </Button>
+            </div>
           ) : null
         }
       />
