@@ -60,7 +60,7 @@ function LoginForm() {
         setAuthError("Kullanıcı adı veya şifre hatalı.");
       } else if (error instanceof ApiError && error.status === 403) {
         setAuthError(
-          "Güvenlik jetonu (CSRF) eksik ya da geçersiz. Sayfayı yenileyip tekrar deneyin.",
+          "Erişim reddedildi (403). Sayfayı yenileyip tekrar deneyin; sorun sürerse API'nin CORS ayarlarını (ARS_WEB_ORIGINS) kontrol edin.",
         );
       } else {
         setAuthError("Giriş yapılamadı. API servisinin çalıştığından emin olun.");

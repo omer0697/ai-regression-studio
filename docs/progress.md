@@ -83,11 +83,22 @@ komut çıktılarıyla desteklenir; doğrulanmamış hiçbir şey "tamamlandı" 
 10. MinIO Hub imajı kaldırılmış → Bitnami legacy aynası + bucket otomatik kurulum.
 11. PowerShell 5.1 curl JSON kaçışması → duman testinde dosyadan gövde (`-d @file`).
 12. **localhost cookie çakışması:** Çerezler porta göre ayrılmadığı için aynı makinedeki
-    diğer localhost uygulamaları varsayılan `XSRF-TOKEN` adlı CSRF çerezini ezebiliyordu
-    (gerçek oturumda giriş 403 verdi). Çerezler isim alanına taşındı:
-    `ARS-XSRF-TOKEN` + `ARS-SESSIONID`; web istemcisi yeni adı okur (eski ad yedek olarak),
-    entegrasyon testi güncellendi. Ayrıca derleme sırasında çalışan konteynerin jar kilidi
-    tespit edildi → yeniden derleme öncesi konteyner durdurulmalı (Windows dosya kilidi).
+    diğer localhost uygulamaları varsayılan `XSRF-TOKEN` adlı CSRF çerezini ezebiliyordu.
+    Çerezler isim alanına taşındı: `ARS-XSRF-TOKEN` + `ARS-SESSIONID`; web istemcisi yeni
+    adı okur (eski ad yedek olarak), entegrasyon testi güncellendi. Ayrıca derleme sırasında
+    çalışan konteynerin jar kilidi tespit edildi → yeniden derleme öncesi konteyner durdurulmalı.
+13. **Gerçek tarayıcıda girişin 403 reddi (kök neden):** Tarayıcılar her POST fetch'e
+    `Origin` başlığı ekler (same-origin olsa bile). Next proxy bu başlığı API'ye aynen
+    taşır; Spring CORS filtresi izin listesinde olmayan `http://localhost:3100` kökenini
+    "Invalid CORS request" ile 403'e çeviriyordu. curl `Origin` göndermediği için tüm
+    sunucu tarafı testler geçiyordu — **Playwright MCP ile gerçek tarayıcıda yeniden
+    üretilip teşhis edildi.** Çözüm: desen bazlı CORS listesi
+    (`http://localhost:*,http://127.0.0.1:*`; üretimde `ARS_WEB_ORIGINS` ile sıkılaştırılır),
+    yanıltıcı "CSRF" hata mesajı düzeltildi, favicon eklendi (konsol gürültüsü kesildi).
+    Doğrulama: Origin başlıklı login 200 ✓, kötü niyetli origin 403 ✓,
+    **Playwright ile gerçek Chromium'da login → panel → çalıştırma detayı + SSE olayları
+    render edildi, konsol hatası 0** (kanıt: `ars-login-success.png`, `ars-execution-detail.png`).
+    Not: `@playwright/mcp` OpenCode MCP sunucusu olarak projeye eklendi (`opencode mcp list`).
 
 ### Yol Ayrımı Kararları
 

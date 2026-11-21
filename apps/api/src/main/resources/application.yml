@@ -49,9 +49,10 @@ app:
     # executions then finish honestly as NOT_SUPPORTED/WORKER_NOT_CONFIGURED.
     base-url: ${ARS_WORKER_BASE_URL:}
   cors:
-    # Only relevant when the web app calls the API directly instead of the
-    # same-origin Next.js proxy (see apps/web/next.config.ts).
-    allowed-origins: ${ARS_WEB_ORIGINS:http://localhost:3000}
+    # Pattern-based list. Browsers attach Origin to every POST (same-origin
+    # included), so the dev proxy port must be allowed; localhost:* covers
+    # all dev ports. Production tightens this via ARS_WEB_ORIGINS.
+    allowed-origins: ${ARS_WEB_ORIGINS:http://localhost:*,http://127.0.0.1:*}
 
 logging:
   level:

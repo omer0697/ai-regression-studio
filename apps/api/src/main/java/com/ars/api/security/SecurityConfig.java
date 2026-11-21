@@ -89,7 +89,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource(AppProperties properties) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(properties.cors().allowedOrigins());
+        // Pattern-based list: browsers attach an Origin header to every POST
+        // (same-origin included), so the dev proxy port must be allowed.
+        // Default covers every localhost port; production tightens via env.
+        configuration.setAllowedOriginPatterns(properties.cors().allowedOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowCredentials(true);
         configuration.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN", "Accept"));
