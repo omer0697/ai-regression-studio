@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <title>KPY68 — Parametre Tanımları (GWT Fixture)</title>
+  <style>
+    body { font-family: Tahoma, Arial, sans-serif; font-size: 12px; margin: 0; background: #fff; }
+    .gwt-TitleBar { background: #2d4d7f; color: #fff; padding: 8px 12px; font-weight: bold; }
+    table.gwt-FormLayout { border-collapse: collapse; margin: 12px; }
+    table.gwt-FormLayout td { padding: 4px 8px; vertical-align: middle; }
+    td.gwt-FormLabel { width: 180px; color: #333; }
+    .gwt-TextBox { border: 1px solid #7f9db9; padding: 2px; }
+    .gwt-Button { padding: 3px 10px; }
+    table.gwt-DataTable { border-collapse: collapse; margin: 12px; }
+    table.gwt-DataTable th { background: #dfe8f6; border: 1px solid #9cb3d5; padding: 4px; text-align: left; }
+    table.gwt-DataTable td { border: 1px solid #c9d7ec; padding: 4px; }
+    .gwt-Label { color: #333; }
+  </style>
+</head>
+<body>
+  <div class="gwt-TitleBar">KPY68 — Parametre Tanımları</div>
+
+  <table class="gwt-FormLayout" role="form">
+    <tr>
+      <td class="gwt-FormLabel">Parametre Kodu</td>
+      <td><input type="text" class="gwt-TextBox" name="paramCode" value="KPY-001" required aria-required="true"></td>
+    </tr>
+    <tr>
+      <td class="gwt-FormLabel">Parametre Tipi</td>
+      <td>
+        <select class="gwt-ListBox" name="paramType">
+          <option value="STANDART">STANDART</option>
+          <option value="OZEL" selected>OZEL</option>
+          <option value="DIGER">DIGER</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <td class="gwt-FormLabel">Parametre Değeri</td>
+      <td><input type="text" class="gwt-TextBox gwt-TextBox-Disabled" name="paramValue" value="" disabled></td>
+    </tr>
+    <tr>
+      <td class="gwt-FormLabel">Açıklama</td>
+      <td><textarea class="gwt-TextArea" name="description" rows="3">Varsayılan açıklama</textarea></td>
+    </tr>
+    <tr>
+      <td class="gwt-FormLabel">Başlangıç Tarihi</td>
+      <td><input type="date" class="gwt-DateBox" name="startDate" value="2026-01-15"></td>
+    </tr>
+    <tr>
+      <td class="gwt-FormLabel">Aktif</td>
+      <td><input type="checkbox" class="gwt-CheckBox" name="active" checked></td>
+    </tr>
+    <tr>
+      <td class="gwt-FormLabel">Onay Tipi</td>
+      <td>
+        <input type="radio" class="gwt-RadioButton" name="approvalType" value="OTOMATIK" checked> Otomatik
+        <input type="radio" class="gwt-RadioButton" name="approvalType" value="MANUEL"> Manuel
+      </td>
+    </tr>
+    <tr>
+      <td class="gwt-FormLabel">Gizli Not (hidden field)</td>
+      <td><input type="hidden" class="gwt-Hidden" name="hiddenNote" value="internal-123"></td>
+    </tr>
+    <tr>
+      <td></td>
+      <td>
+        <button type="button" class="gwt-Button" id="btnSearch">Sorgula</button>
+        <button type="button" class="gwt-Button" id="btnClear">Temizle</button>
+        <button type="button" class="gwt-Button" id="btnPdf">PDF Oluştur</button>
+      </td>
+    </tr>
+  </table>
+
+  <div class="gwt-Label" id="resultHeader">Sorgu Sonuçları (2 kayıt)</div>
+  <table class="gwt-DataTable">
+    <thead>
+      <tr><th>Kod</th><th>Tip</th><th>Değer</th><th>Durum</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>KPY-001</td><td>OZEL</td><td>ABC-123</td><td>Aktif</td></tr>
+      <tr><td>KPY-002</td><td>STANDART</td><td>XYZ-9</td><td>Pasif</td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

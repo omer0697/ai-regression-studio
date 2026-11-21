@@ -7,12 +7,17 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Application-level configuration bound from the {@code app.*} properties.
  *
- * <p>Secrets are never stored in this application's database — the worker
- * base URL, seed credentials and CORS origins come from environment
- * variables only.</p>
+ * <p>Secrets are never stored in this application's database — worker base
+ * URL, internal callback token, seed credentials, CORS patterns and storage
+ * credentials come from environment variables only.</p>
  */
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(Seed seed, Worker worker, Cors cors) {
+public record AppProperties(
+        Seed seed,
+        Worker worker,
+        Cors cors,
+        Internal internal,
+        Storage storage) {
 
     public record Seed(String adminUsername, String adminPassword) {
     }
@@ -24,5 +29,19 @@ public record AppProperties(Seed seed, Worker worker, Cors cors) {
     }
 
     public record Cors(List<String> allowedOrigins) {
+    }
+
+    /** Shared secret guarding the /api/internal/** callback endpoints. */
+    public record Internal(String token) {
+        public boolean enabled() {
+            return token != null && !token.isBlank();
+        }
+    }
+
+    /** S3-compatible evidence storage (MinIO). */
+    public record Storage(String endpoint, String accessKey, String secretKey, String bucket) {
+        public boolean enabled() {
+            return endpoint != null && !endpoint.isBlank();
+        }
     }
 }

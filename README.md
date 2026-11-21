@@ -78,8 +78,27 @@ docker run --rm -it -p 8080:8080 `
 ```powershell
 npm install                 # monorepo kökünde, ilk kez
 npm run build               # packages + worker derlemesi
-npm run dev:worker          # http://localhost:9100
+npx playwright install chromium   # ilk kez: tarayıcı ikilileri
+
+# Geliştirme: API callback + fixture kimlikleri ile
+$env:WORKER_API_BASE_URL="http://localhost:8080"
+$env:WORKER_INTERNAL_TOKEN="ars-dev-internal-token"
+$env:WORKER_CREDENTIALS_FILE="apps/browser-worker/fixtures/credentials.example.json"
+node apps/browser-worker/dist/index.js    # http://localhost:9100
 ```
+
+Worker hazır olduğunda `/api/health` → `"ready": true` döner; **fixture uygulamaları**
+`http://localhost:9100/fixtures/gwt-kpy68.html` adresinden servis edilir. Projedeki
+ortamı bu adrese + `TEST_ACCOUNT_FORM` girişine yönlendirip (loginUrl:
+`/fixtures/login.html`, seçiciler `input[name='username']`, `input[name='password']`,
+`button[type='submit']`, kimlik referansı `kap-gwt-test-user`) **Çalıştır** dediğinizde
+worker gerçek Chromium ile giriş yapar, KPY68 ekranını pasif olarak keşfeder ve
+screenshot + trace kanıtlarını MinIO'ya yükler; panelde canlı izlersiniz.
+
+> **Sır yönetimi:** `credentials.example.json` yalnızca fixture demo hesabıdır
+> (`testuser / test-pass-123`). Gerçek ortamlar için git-ignore'lı
+> `credentials.local.json` kullanın (`WORKER_CREDENTIALS_FILE`); üretimde bunun yerini
+> şirket sır deposu alır.
 
 ### 4) Paneli açın
 
@@ -158,10 +177,10 @@ docker run --rm -v "${PWD}\apps\api:/app" -v ars-maven-cache:/root/.m2 `
 | Faz | Kapsam | Durum |
 | --- | --- | --- |
 | 1 — Foundation | Monorepo, web/api/worker iskeletleri, auth+RBAC, proje/ortam/ekran yönetimi, çalıştırma API'si, SSE, altyapı, testler | ✅ Tamamlandı |
-| 2 — Browser Automation | Playwright yaşam döngüsü, GWT/React adaptörleri, keşif, screenshot/trace/kanıt | Sırada |
-| 3 — UI Discovery | Eleman keşfi, normalize metadata, güvenli etkileşim | Planlandı |
+| 2 — Browser Automation | Playwright yaşam döngüsü, izole context'ler, güvenli test girişi, GWT/React adaptörleri, pasif keşif, screenshot/trace/kanıt (MinIO), canlı ilerleme | ✅ Tamamlandı |
+| 3 — UI Discovery | Etkileşimli keşif (bağımlılık tespiti), keşif bütçeleri | Sırada |
 | 4 — DeepSeek Agent | AI sağlayıcı, senaryo üretimi, semantik eşleme | Planlandı |
-| 5 — Differential Engine | GWT ↔ React karşılaştırma, kanıt destekli bulgular | Planlandı |
+| 5 — Differential Engine | GWT ↔ React karşılaştırma, execute işleri, kanıt destekli bulgular | Planlandı |
 | 6 — Document Workflows | PDF üretim/karşılaştırma, imza, şifreleme | Planlandı |
 | 7 — Reporting | Hata paneli, yan yana kanıt, dışa aktarma | Planlandı |
 | 8 — Hardening | Güvenlik/performans/izolasyon sağlamlaştırma | Planlandı |

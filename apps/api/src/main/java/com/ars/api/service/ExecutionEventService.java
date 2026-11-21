@@ -27,9 +27,15 @@ public class ExecutionEventService {
     @Transactional
     public void append(Long executionId, ExecutionEventType type, String message,
             String payloadKey, Object payloadValue) {
+        append(executionId, type, message,
+                payloadKey == null ? null : java.util.Map.of(payloadKey, payloadValue));
+    }
+
+    @Transactional
+    public void append(Long executionId, ExecutionEventType type, String message,
+            java.util.Map<String, Object> payload) {
         long nextSeq = repository.findMaxSeq(executionId) + 1;
-        repository.save(new ExecutionEvent(executionId, nextSeq, type, message,
-                payloadKey == null ? null : java.util.Map.of(payloadKey, payloadValue)));
+        repository.save(new ExecutionEvent(executionId, nextSeq, type, message, payload));
     }
 
     @Transactional

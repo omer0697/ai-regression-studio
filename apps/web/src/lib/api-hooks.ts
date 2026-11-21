@@ -166,3 +166,21 @@ export function useExecution(id: number) {
     },
   });
 }
+
+export function useExecutionArtifacts(id: number) {
+  return useQuery({
+    queryKey: ["executions", id, "artifacts"] as const,
+    queryFn: () => api.listExecutionArtifacts(id),
+    enabled: Number.isFinite(id),
+    refetchInterval: 5000,
+  });
+}
+
+export function useExecutionElements(id: number) {
+  return useQuery({
+    queryKey: ["executions", id, "elements"] as const,
+    queryFn: () => api.listExecutionElements(id),
+    enabled: Number.isFinite(id),
+    refetchInterval: (query) => (query.state.data?.length ? false : 5000),
+  });
+}

@@ -113,7 +113,6 @@ public class ExecutionService {
 
     private ExecutionView markQueued(TestExecution execution, Project project, ScreenDefinition screen) {
         execution.setStatus(ExecutionStatus.QUEUED);
-        execution.setStartedAt(java.time.Instant.now());
         executionRepository.save(execution);
         return toView(execution, project, screen, null);
     }

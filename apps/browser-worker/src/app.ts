@@ -1,14 +1,29 @@
 import Fastify, { type FastifyInstance } from "fastify";
 
+import { BrowserLifecycle } from "./browser/lifecycle.js";
+import { loadConfig, type WorkerConfig } from "./config.js";
+import { loadCredentialStore, type CredentialStore } from "./credentials.js";
 import { healthRoutes } from "./routes/health.js";
-import { jobRoutes } from "./routes/jobs.js";
+import { fixtureRoutes } from "./routes/fixtures.js";
+import { createJobRoutes } from "./routes/jobs.js";
+import { DiscoverJobRunner } from "./runner.js";
 
 export interface BuildAppOptions {
   /** CORS origins allowed to call this worker directly (optional). */
   allowedOrigins?: string[];
+  /** Injected for tests; defaults come from the environment. */
+  config?: WorkerConfig;
+  browser?: BrowserLifecycle;
+  credentials?: CredentialStore;
+  runner?: DiscoverJobRunner;
 }
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
+  const config = options.config ?? loadConfig();
+  const browser = options.browser ?? new BrowserLifecycle(config);
+  const credentials = options.credentials ?? loadCredentialStore(config);
+  const runner = options.runner ?? new DiscoverJobRunner(browser, credentials);
+
   const app = Fastify({
     logger: {
       level: process.env.LOG_LEVEL ?? "info",
@@ -43,7 +58,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   void app.register(healthRoutes);
-  void app.register(jobRoutes);
+  void app.register(fixtureRoutes);
+  void app.register(createJobRoutes(config, browser, credentials, runner));
 
   return app;
 }

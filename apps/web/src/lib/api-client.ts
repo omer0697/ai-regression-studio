@@ -1,6 +1,8 @@
 import type {
   ApiErrorShape,
+  ArtifactInfo,
   DashboardData,
+  DiscoveredElementRecord,
   EnvironmentConfig,
   ExecutionEventListResponse,
   ExecutionSummary,
@@ -177,4 +179,13 @@ export const api = {
     }),
   listExecutionEvents: (id: number, from = 0) =>
     request<ExecutionEventListResponse>(`/executions/${id}/events?from=${from}`),
+  listExecutionArtifacts: (id: number) =>
+    request<ArtifactInfo[]>(`/executions/${id}/artifacts`),
+  listExecutionElements: (id: number) =>
+    request<DiscoveredElementRecord[]>(`/executions/${id}/elements`),
 };
+
+/** Same-origin URL that streams artifact bytes with the session cookie. */
+export function artifactContentUrl(artifactId: number): string {
+  return `${API_BASE}/artifacts/${artifactId}/content`;
+}

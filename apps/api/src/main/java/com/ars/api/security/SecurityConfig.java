@@ -57,9 +57,15 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
-                        .csrfTokenRequestHandler(csrfRequestHandler))
+                        .csrfTokenRequestHandler(csrfRequestHandler)
+                        // The worker callback channel is authenticated by the
+                        // internal token filter, not by browser sessions.
+                        .ignoringRequestMatchers("/api/internal/**"))
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .authorizeHttpRequests(auth -> auth
+                        // Worker callback channel is guarded by the internal
+                        // token filter, not by user sessions.
+                        .requestMatchers("/api/internal/**").permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/me", "/api/auth/logout").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         .anyRequest().authenticated())
@@ -84,6 +90,21 @@ public class SecurityConfig {
     @Bean
     public org.springframework.security.core.context.SecurityContextHolderStrategy securityContextHolderStrategy() {
         return org.springframework.security.core.context.SecurityContextHolder.getContextHolderStrategy();
+    }
+
+    /**
+     * Registers the internal token guard only on the callback paths; it runs
+     * after the security chain (which permits /api/internal/** for sessions).
+     */
+    @Bean
+    public org.springframework.boot.web.servlet.FilterRegistrationBean<InternalTokenFilter> internalTokenFilter(
+            com.ars.api.config.AppProperties properties) {
+        var registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>(
+                new InternalTokenFilter(properties));
+        registration.addUrlPatterns("/api/internal/*");
+        registration.setOrder(org.springframework.core.Ordered.LOWEST_PRECEDENCE);
+        registration.setName("internalTokenFilter");
+        return registration;
     }
 
     @Bean

@@ -53,6 +53,16 @@ app:
     # included), so the dev proxy port must be allowed; localhost:* covers
     # all dev ports. Production tightens this via ARS_WEB_ORIGINS.
     allowed-origins: ${ARS_WEB_ORIGINS:http://localhost:*,http://127.0.0.1:*}
+  internal:
+    # Shared secret for the worker -> API callback channel (/api/internal/**).
+    # Set a strong value before deploying beyond a local machine.
+    token: ${ARS_INTERNAL_TOKEN:ars-dev-internal-token}
+  storage:
+    # S3-compatible evidence storage (screenshots / traces / logs).
+    endpoint: ${ARS_MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${ARS_MINIO_ACCESS_KEY:ars-minio}
+    secret-key: ${ARS_MINIO_SECRET_KEY:ars-minio-secret}
+    bucket: ${ARS_MINIO_BUCKET:ars-artifacts}
 
 logging:
   level:

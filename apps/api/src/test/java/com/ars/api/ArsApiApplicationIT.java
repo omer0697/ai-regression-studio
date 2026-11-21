@@ -85,7 +85,7 @@ class ArsApiApplicationIT {
         ResponseEntity<String> login = exchange(HttpMethod.POST, "/api/auth/login",
                 Map.of("username", SEED_USERNAME, "password", SEED_PASSWORD), null);
         assertThat(login.getStatusCode().value()).isEqualTo(200);
-        assertThat(cookies).containsKey("JSESSIONID");
+        assertThat(cookies).containsKey("ARS-SESSIONID");
 
         // 6. Authenticated session reflects the seeded admin user.
         ResponseEntity<String> meAfter = exchange(HttpMethod.GET, "/api/auth/me", null, null);

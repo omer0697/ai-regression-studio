@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <title>KAP GWT — Giriş (Fixture)</title>
+  <style>
+    body { font-family: Tahoma, Arial, sans-serif; font-size: 12px; background: #eef1f6; }
+    .login-box { width: 320px; margin: 80px auto; background: #fff; border: 1px solid #b6c4dd; padding: 16px; }
+    .login-box h3 { margin-top: 0; color: #2d4d7f; }
+    input { border: 1px solid #7f9db9; padding: 4px; width: 240px; margin: 4px 0; }
+    button { padding: 4px 12px; margin-top: 8px; }
+    .error { color: #c00; display: none; }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <h3>KAP — Kullanıcı Girişi</h3>
+    <!-- Form is handled by script so credentials never leak into the URL. -->
+    <form id="loginForm">
+      <div><input type="text" name="username" placeholder="Kullanıcı adı"></div>
+      <div><input type="password" name="password" placeholder="Şifre"></div>
+      <div class="error" id="errBox">Kullanıcı adı veya şifre hatalı.</div>
+      <button type="submit" class="gwt-Button">Giriş Yap</button>
+    </form>
+  </div>
+  <script>
+    // Fixture auth: the demo credentials are testuser / test-pass-123.
+    // A wrong password keeps the form visible (simulating a rejected login).
+    document.getElementById("loginForm").addEventListener("submit", function (event) {
+      event.preventDefault();
+      var password = this.elements["password"].value;
+      if (password === "test-pass-123") {
+        window.location.assign("gwt-kpy68.html");
+      } else {
+        document.getElementById("errBox").style.display = "block";
+      }
+    });
+  </script>
+</body>
+</html>

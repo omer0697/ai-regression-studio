@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <title>KPY68 — Parametre Tanımları (React Fixture)</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 14px; margin: 0; background: #f5f6fa; color: #222; }
+    .app-header { background: #1f2a44; color: #fff; padding: 14px 24px; font-weight: 600; }
+    .ant-form { max-width: 640px; margin: 24px auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+    .ant-form-item { margin-bottom: 18px; display: flex; flex-direction: column; gap: 6px; }
+    .ant-form-item-label label { font-weight: 500; color: #333; }
+    .ant-input, .ant-select { border: 1px solid #d9d9d9; border-radius: 6px; padding: 6px 10px; width: 100%; box-sizing: border-box; }
+    .ant-btn { border: none; border-radius: 6px; padding: 7px 16px; background: #1677ff; color: #fff; cursor: pointer; }
+    .ant-btn-secondary { background: #fff; color: #222; border: 1px solid #d9d9d9; }
+    .ant-table { width: 100%; border-collapse: collapse; margin: 16px auto; max-width: 640px; background: #fff; }
+    .ant-table th { background: #fafafa; border-bottom: 1px solid #f0f0f0; padding: 10px; text-align: left; }
+    .ant-table td { border-bottom: 1px solid #f0f0f0; padding: 10px; }
+    .app-content { max-width: 688px; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <header class="app-header">KAP — KPY68 Parametre Tanımları</header>
+    <div class="app-content">
+      <form class="ant-form">
+        <div class="ant-form-item">
+          <div class="ant-form-item-label"><label for="paramCode">Parametre Kodu</label></div>
+          <input class="ant-input" id="paramCode" name="paramCode" value="KPY-001" required>
+        </div>
+        <div class="ant-form-item">
+          <div class="ant-form-item-label"><label for="paramType">Parametre Tipi</label></div>
+          <select class="ant-select" id="paramType" name="paramType">
+            <option value="STANDART">STANDART</option>
+            <option value="OZEL" selected>OZEL</option>
+            <option value="DIGER">DIGER</option>
+          </select>
+        </div>
+        <div class="ant-form-item">
+          <div class="ant-form-item-label"><label for="paramValue">Parametre Değeri</label></div>
+          <input class="ant-input" id="paramValue" name="paramValue" value="ABC-123" disabled>
+        </div>
+        <div class="ant-form-item">
+          <div class="ant-form-item-label"><label for="description">Açıklama</label></div>
+          <textarea class="ant-input" id="description" name="description" rows="3">Varsayılan açıklama</textarea>
+        </div>
+        <div class="ant-form-item">
+          <div class="ant-form-item-label"><label for="startDate">Başlangıç Tarihi</label></div>
+          <input class="ant-input" type="date" id="startDate" name="startDate" value="2026-01-15">
+        </div>
+        <div class="ant-form-item">
+          <div class="ant-form-item-label"><label for="active">Aktif</label></div>
+          <input type="checkbox" id="active" name="active" checked>
+        </div>
+        <div class="ant-form-item">
+          <span class="ant-btn" role="button" tabindex="0" id="btnSearch">Sorgula</span>
+          <span class="ant-btn ant-btn-secondary" role="button" tabindex="0" id="btnClear">Temizle</span>
+          <span class="ant-btn ant-btn-secondary" role="button" tabindex="0" id="btnPdf">PDF Oluştur</span>
+        </div>
+      </form>
+
+      <table class="ant-table">
+        <thead><tr><th>Kod</th><th>Tip</th><th>Değer</th><th>Durum</th></tr></thead>
+        <tbody>
+          <tr><td>KPY-001</td><td>OZEL</td><td>ABC-123</td><td>Aktif</td></tr>
+          <tr><td>KPY-002</td><td>STANDART</td><td>XYZ-9</td><td>Pasif</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

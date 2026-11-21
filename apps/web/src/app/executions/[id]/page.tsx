@@ -14,7 +14,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useExecution, useStartExecution } from "@/lib/api-hooks";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  useExecution,
+  useExecutionArtifacts,
+  useExecutionElements,
+  useStartExecution,
+} from "@/lib/api-hooks";
+import { artifactContentUrl } from "@/lib/api-client";
 import { useExecutionStream } from "@/lib/execution-stream";
 import {
   MODE_LABELS,
@@ -52,6 +66,8 @@ export default function ExecutionDetailPage() {
   const executionId = Number(params?.id);
 
   const { data: execution } = useExecution(executionId);
+  const { data: artifacts } = useExecutionArtifacts(executionId);
+  const { data: elements } = useExecutionElements(executionId);
   const stream = useExecutionStream(Number.isFinite(executionId) ? executionId : null);
 
   const startExecution = useStartExecution(execution?.projectId ?? 0);
@@ -162,20 +178,118 @@ export default function ExecutionDetailPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-dashed">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-muted-foreground">
-                Ekran Görüntüleri ve Kanıt Dosyaları
-              </CardTitle>
+              <CardTitle>Keşfedilen Elemanlar</CardTitle>
               <CardDescription>
-                Tarayıcı otomasyonu 2. Fazda devreye girdiğinde burada gerçek
-                ekran görüntüleri, trace kayıtları ve kanıt dosyaları listelenecek.
-                Şu anda sahte kanıt gösterilmez.
+                Worker tarafından gerçek tarayıcı oturumundan normalize edilmiş
+                alan kayıtları. Gizli alanlar kaydedilir ama &quot;atlandı&quot; olarak
+                sayılır; sahte kayıt üretilmez.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex items-center gap-2 text-sm text-muted-foreground">
-              <IconX className="text-muted-foreground" />
-              Bu çalıştırma için kanıt üretimi henüz yok.
+            <CardContent className="p-0">
+              {!elements || elements.length === 0 ? (
+                <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  Henüz keşif sonucu yok.
+                </p>
+              ) : (
+                <div className="max-h-96 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Ref</TableHead>
+                        <TableHead>Etiket</TableHead>
+                        <TableHead>Tip</TableHead>
+                        <TableHead>Değer</TableHead>
+                        <TableHead>Durum</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {elements.map((element) => (
+                        <TableRow key={element.ref}>
+                          <TableCell className="font-mono text-xs text-muted-foreground">
+                            {element.ref}
+                          </TableCell>
+                          <TableCell className="max-w-48 truncate">
+                            {element.label ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {element.elementType}
+                          </TableCell>
+                          <TableCell className="max-w-48 truncate text-muted-foreground">
+                            {element.value ?? "—"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              <Badge tone={element.enabled ? "success" : "muted"}>
+                                {element.enabled ? "etkin" : "pasif"}
+                              </Badge>
+                              <Badge tone={element.visible ? "info" : "warning"}>
+                                {element.visible ? "görünür" : "gizli"}
+                              </Badge>
+                              {element.required ? <Badge tone="danger">zorunlu</Badge> : null}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Kanıtlar</CardTitle>
+              <CardDescription>
+                Gerçek tarayıcı oturumundan üretilen ekran görüntüleri, trace
+                kayıtları ve tanılama dosyaları.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!artifacts || artifacts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Bu çalıştırma için henüz kanıt üretilmedi.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {artifacts
+                    .filter((artifact) => artifact.artifactType === "SCREENSHOT")
+                    .map((artifact) => (
+                      <figure key={artifact.id} className="flex flex-col gap-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={artifactContentUrl(artifact.id)}
+                          alt={artifact.displayName}
+                          className="w-full rounded-lg border border-border-subtle"
+                        />
+                        <figcaption className="text-xs text-muted-foreground">
+                          {artifact.displayName} ·{" "}
+                          {artifact.byteSize
+                            ? `${Math.round(artifact.byteSize / 1024)} KB`
+                            : ""}
+                        </figcaption>
+                      </figure>
+                    ))}
+                  {artifacts
+                    .filter((artifact) => artifact.artifactType !== "SCREENSHOT")
+                    .map((artifact) => (
+                      <a
+                        key={artifact.id}
+                        href={artifactContentUrl(artifact.id)}
+                        className="text-sm text-primary hover:underline"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {artifact.artifactType === "TRACE"
+                          ? "▶ Playwright trace (zip)"
+                          : artifact.displayName}{" "}
+                        ({Math.round((artifact.byteSize ?? 0) / 1024)} KB)
+                      </a>
+                    ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </>

@@ -14,11 +14,20 @@ services:
       ARS_SEED_ADMIN_USERNAME: ${ARS_SEED_ADMIN_USERNAME:-admin}
       ARS_SEED_ADMIN_PASSWORD: ${ARS_SEED_ADMIN_PASSWORD:-admin123!}
       ARS_WORKER_BASE_URL: http://worker:9100
-      ARS_WEB_ORIGINS: http://localhost:3000
+      ARS_WEB_ORIGINS: ${ARS_WEB_ORIGINS:-http://localhost:*}
+      # Worker -> API callback channel secret (set a strong value in production).
+      ARS_INTERNAL_TOKEN: ${ARS_INTERNAL_TOKEN:-ars-dev-internal-token}
+      # Evidence storage (screenshots / traces / logs).
+      ARS_MINIO_ENDPOINT: http://minio:9000
+      ARS_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-ars-minio}
+      ARS_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-ars-minio-secret}
+      ARS_MINIO_BUCKET: ars-artifacts
     ports:
       - "8080:8080"
     depends_on:
       postgres:
+        condition: service_healthy
+      minio:
         condition: service_healthy
 
   worker:
@@ -27,8 +36,15 @@ services:
       dockerfile: apps/browser-worker/Dockerfile
     environment:
       WORKER_PORT: "9100"
+      WORKER_API_BASE_URL: http://api:8080
+      WORKER_INTERNAL_TOKEN: ${ARS_INTERNAL_TOKEN:-ars-dev-internal-token}
+      # Containerized runs keep the example fixture credentials; production
+      # mounts a real secret store instead.
+      WORKER_CREDENTIALS_FILE: fixtures/credentials.example.json
     ports:
       - "9100:9100"
+    depends_on:
+      - api
 
   web:
     build:

@@ -39,6 +39,20 @@ gereken adımları tanımlar. Platform, şirket **iç ağı** ve onaylı **test 
   worker tarafında zorlanır; API zaten dış istek yapmaz — worker sağlık kontrolü dışında).
 - **Tarayıcı izolasyonu:** GWT ve React için ayrı, depo-temizlenmiş tarayıcı context'leri (Faz 2).
 
+## Test Güvenliği Kanalları (Faz 2)
+
+- **Worker → API callback (`/api/internal/**`):** `X-ARS-Internal-Token` başlığı sabit-zamanlı
+  karşılaştırmayla doğrulanır; jeton yapılandırılmamışsa uçlar 404 ile tamamen kapalıdır.
+  CSRF bu kanal için devre dışıdır — kimlik doğrulama token'la yapılır, tarayıcı oturumu değildir.
+- **Tarayıcı izolasyonu:** iş başına depo-temizlenmiş izole context; koşucu (runner) hedefe
+  yalnızca yapılandırılmış `baseUrl`/`loginUrl` üzerinden gider.
+- **Sır yönetimi (worker):** kimlik bilgileri yalnızca referans adıyla çözülür; yerel geliştirmede
+  git-ignore'lı `credentials.local.json` (örnek: `fixtures/credentials.example.json`), üretimde
+  şirket sır deposu. Kimlik bilgileri log'lara, trace'lere veya URL'lere sızmaz (fixture login'i
+  bu yüzden JS yönlendirmelidir).
+- **Kanıt erişimi:** artifact içerik uçları oturumla kimlik doğrulır; MinIO erişimi yalnızca
+  API içerisindedir (worker ve tarayıcı doğrudan nesne deposuna dokunmaz).
+
 ## AI Güvenliği (Faz 4 hazırlıkları)
 
 - `packages/test-schemas` içinde **kapalı aksiyon sözlüğü** (`SAFE_ACTIONS`): shell, keyif JS çalıştırma,

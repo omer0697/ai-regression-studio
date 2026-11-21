@@ -1,22 +1,23 @@
 /**
  * Single source of truth for what this worker can actually do.
  *
- * Phase 1 ships the service skeleton only. Browser automation (Playwright)
- * arrives in Phase 2. The worker reports capabilities honestly and rejects
- * job requests it cannot execute — it never fakes results.
+ * Phase 2: browser automation is live — Chromium lifecycle, secure form login,
+ * GWT/React adapters, element discovery, screenshots, traces and console/
+ * network diagnostics. Capabilities are reported honestly and the /api/jobs
+ * endpoint refuses job types that are still not implemented.
  */
 export const WORKER_CAPABILITIES = {
-  browserAutomation: false,
-  elementDiscovery: false,
-  screenshot: false,
-  traceRecording: false,
-  networkObservation: false,
+  browserAutomation: true,
+  elementDiscovery: true,
+  screenshot: true,
+  traceRecording: true,
+  networkObservation: true,
 } as const;
 
 export type WorkerCapability = keyof typeof WORKER_CAPABILITIES;
 
-/** Phase in which browser automation is scheduled to land. */
-export const PLANNED_AUTOMATION_PHASE = 2;
+/** Phase in which scenario execution/comparison lands. */
+export const PLANNED_COMPARISON_PHASE = 5;
 
 export function hasBrowserAutomation(): boolean {
   return WORKER_CAPABILITIES.browserAutomation;

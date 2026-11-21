@@ -119,7 +119,90 @@ komut çıktılarıyla desteklenir; doğrulanmamış hiçbir şey "tamamlandı" 
 5. Screenshot/trace/kanıt üretimi → MinIO; worker → API geri bildirim kanalı (olay + durum itmesi)
 6. İlk gerçek keşif çalıştırması: KPY68 DOM'unu tarayıp normalize eleman kaydı (Faz 3'ün girdisi)
 
+## Faz 2 — Browser Automation ✅ (21 Kasım 2026)
+
+### Tamamlananlar
+
+**Browser worker (`apps/browser-worker`)**
+- **Playwright 1.65 entegrasyonu:** singleton Chromium yaşam döngüsü (`BrowserLifecycle`),
+  iş başına **tam izole** tarayıcı context'i (ayrı cookie/depo), her zaman `finally` ile
+  kapatma, zarif kapanma sinyalleri
+- **Güvenli test girişi:** kimlik bilgisi yalnızca *referans adıyla* çözülür
+  (`WORKER_CREDENTIALS_FILE` yerel depo; üretimde şirket sır deposu). Giriş akışı:
+  login sayfası → seçicilerle doldur → durum-bazlı bekleme (URL değişimi) → reddedilen
+  girişte dürüst `FAILED`
+- **GWT ve React adaptörleri:** ayrı DOM stratejileri (GWT: tablo hücresi etiketi,
+  `gwt-*` hazır bulma; React: `ant-form-item` etiketleri) — ortak DOM varsayımı yok;
+  state-bazlı hazır beklemeleri, **rastgele sleep yok**
+- **Normalize eleman kaydı (sayfa-içi keşif):** etiket/erişilebilir ad/değer/durum
+  (etkin, görünür, zorunlu)/seçenekler/DOM yolu/**güven skoru**; gizli alanlar kaydedilir
+  ama görünmez işaretlenir; DOM içeriği yalnızca **veri** olarak okunur (prompt
+  injection'a dirençli)
+- **Kanıt üretimi:** tam sayfa screenshot, Playwright trace (zip), konsol/sayfa hatası
+  ve başarısız ağ isteği tanılamaları
+- **Geri bildirim kanalı (`ExecutionReporter`):** olay/durum/eleman/kanıt gönderimleri
+  sabit içerik jetonuyla API'ye; geçici hata için 1 yeniden deneme; kayıp olay akışı
+  asla tarayıcı oturumunu düşürmez
+- **İş sözleşmesi:** geçerli discover işi → 202 + tek-uçuş kuyruk + yinelenen dağıtım
+  reddi (409); `execute` ve `COMPARISON` → dürüst 501 (Faz 5)
+- **Fixture uygulamaları (master prompt §20):** GWT-vari KPY68 (tablo yerleşimi,
+  pasif bağımlı alan, gizli alan, seçenekli dropdown, radio, tablo), React-vari KPY68
+  (antd benzeri), JS-şifreli login sayfası; worker `/fixtures/*` üzerinden servis eder
+
+**API (`apps/api`)**
+- **Flyway V2:** `discovered_element` + `artifact` tabloları (indeksler + CHECK'ler)
+- **Internal callback kanalı:** `/api/internal/executions/{id}/events|status|elements|artifacts`
+  — `X-ARS-Internal-Token` sabit-zamanlı karşılaştırma filtresiyle korunur; jeton
+  yapılandırılmamışsa uçlar tamamen kapalı; **CSRF internal yollar için devre dışı**
+  (kanal token'la kimlik doğrulur, tarayıcı oturumu değildir)
+- **Durum makinesi güncellemeleri:** worker `RUNNING` (startedAt) → `COMPLETED/FAILED`
+  (finishedAt + adım sayaçları); terminal durumlar idempotent (tekrar gönderim no-op),
+  geri dönüş (terminal → CREATED vb.) reddedilir
+- **MinIO kanıt deposu (`ArtifactStorageService`, minio 8.5.17):** byte'lar PostgreSQL
+  yerine nesne deposunda; bucket yoksa otomatik oluşturulur; depo erişilemezse
+  `ARTIFACT_STORAGE_UNAVAILABLE` (asla sessiz başarı yok); 25 MB üst sınırı
+- **Kullanıcıya dönük kanıt uçları:** `GET /executions/{id}/artifacts|elements`,
+  `GET /artifacts/{id}/content` (nesne depodan akış, oturumla korunur)
+
+**Panel (`apps/web`)**
+- Çalıştırma detayına **"Keşfedilen Elemanlar"** tablosu (etiket/tip/değer/etkin-görünür-
+  zorunlu rozetleri) ve **"Kanıtlar"** bölümü (inline screenshot + trace/konsol linkleri)
+- Süre gösterimi (`startedAt→finishedAt`), canlı adım sayaçları
+
+### Doğrulama (çalıştırıldı ve geçti)
+
+| Komut | Sonuç |
+| --- | --- |
+| `npm test -w apps/browser-worker` | **13/13** — gerçek Chromium E2E: GWT fixture'da etiketli alanlar, pasif alan, dropdown seçenekleri, gizli alan, tablolar; React fixture keşfi; runner'ın 4 senaryosu (tamamlanma, form girişi, eksik kimlik → FAILED, erişilemez hedef → FAILED) |
+| `mvn -B package` (Docker) | BUILD SUCCESS — 13 birim testi |
+| `mvn -B verify` (Testcontainers) | BUILD SUCCESS — entegrasyon testi (V2 migrasyonu + yeni entity doğrulamaları dahil) |
+| **Canlı uçtan uca** | API(worker'a 202) → worker gerçek Chromium → fixture login kabulü → 14 eleman keşfi → screenshot (22,8 KB PNG, PNG imzası doğrulandı) + trace (126 KB) → MinIO `ars-artifacts/executions/3/` → API `COMPLETED` (13 geçen / 1 atlanan-gizli / 0 başarısız) |
+| **Playwright MCP (gerçek tarayıcı)** | Panel → giriş → çalıştırma #3: "Tamamlandı · 2 sn", keşif tablosu render, kanıt görseli inline, **konsol hatası 0** (kanıt: `ars-phase2-execution.png`) |
+
+### Giderilen Sorunlar
+
+1. `confidence` kolonu Hibernate `Double`↔DB `numeric` uyuşmazlığı → entity `BigDecimal`'a
+   çevrildi (migrasyon sabit kaldı; V2 zaten uygulanmıştı).
+2. **Internal callback'ler 403:** `permitAll` yapılan yollarda CSRF filtresi yine
+   çalışıyordu (permitAll filtre atlatmaz). CSRF internal kanal için
+   `ignoringRequestMatchers` ile devre dışı bırakıldı; kanal token filtresiyle korunur.
+   (Canlı keşifte yakalandı: worker tarayıcı işini bitirmiş ama API'de çalıştırma
+   QUEUED'da kalmıştı.)
+3. Worker kuyruk durumu (`activeExecutions`) modül-seviyesindeydi → route kaydı başına
+   instance'a taşındı (test izolasyonu + çoklu app instance doğruluğu).
+4. Test fixture yolları derinlik hatası (`apps/fixtures` → `apps/browser-worker/fixtures`).
+5. Fixture login'i native GET form'dan JS-yönlendirmeliye çevrildi (kimlik bilgisi
+   URL'ye sızmıyor — trace kayıtlarında sızma riski).
+
+### Faz 2 Kapsamı Dışında (dürüstlük)
+
+- **COMPARISON modu:** worker 501 verir — karşılaştırma motoru Faz 5.
+- **Etkileşimli keşif (bağımlılık tespiti):** Faz 3 (güvenli etkileşim bütçesiyle);
+  bu faz yalnızca pasif tarama yapar — hiçbir iş eylemi gerçekleştirilmez.
+- **Doğal dil komutları / AI:** Faz 4.
+
 ---
+
 
 ## Yapılacaklar Listesi (teknik borç, fazlara dağıtılmış)
 

@@ -13,6 +13,10 @@ target/
 .env.*
 !.env.example
 
+# Local worker credential store (fixture login accounts)
+credentials.local.json
+*.local.json
+
 # Test & tooling artifacts
 coverage/
 test-results/

@@ -192,3 +192,37 @@ export interface SseExecutionEvent {
   event?: ExecutionEvent;
   status?: ExecutionStatus;
 }
+
+/**
+ * Normalized record for a discovered element (Phase 2 discovery output).
+ * Shared between the worker (producer) and the API (persistence contract).
+ */
+export interface DiscoveredElementRecord {
+  ref: string;
+  label: string | null;
+  elementType: string;
+  accessibleName: string | null;
+  value: string | null;
+  enabled: boolean;
+  visible: boolean;
+  required: boolean | null;
+  options: string[] | null;
+  domPath: string | null;
+  confidence: number;
+}
+
+export interface DiscoveredElementListResponse {
+  items: DiscoveredElementRecord[];
+}
+
+export const ARTIFACT_TYPES = ["SCREENSHOT", "TRACE", "CONSOLE_LOG", "NETWORK_LOG"] as const;
+export type ArtifactType = (typeof ARTIFACT_TYPES)[number];
+
+export interface ArtifactInfo {
+  id: number;
+  executionId: number;
+  artifactType: ArtifactType;
+  displayName: string;
+  byteSize: number | null;
+  createdAt: string;
+}

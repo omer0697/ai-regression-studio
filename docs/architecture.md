@@ -19,20 +19,33 @@ AI Regression Studio, eski GWT uygulaması ile yeni React uygulaması arasında 
 | **PostgreSQL** | 17 | Konfigürasyon, senaryo, çalıştırma, olay, denetim verileri |
 | **MinIO** | S3-uyumlu | Screenshot, trace, PDF kanıtları (Faz 2'den itibaren) |
 
-## İstek Akışı (Faz 1)
+## İstek Akışı (Faz 2 sonrası)
 
 ```text
-Browser ── /backend/* (Next rewrite, same-origin) ──▶ Spring Boot API
-                                                        │
-                                              CSRF cookie pattern (XSRF-TOKEN)
-                                                        │
-                                          WorkerClient (RestClient) ──▶ browser-worker /api/jobs
-                                                        │                     │
-                                                        │              Zod şema doğrulama
-                                                        │              kapalı aksiyon sözlüğü
-                                                        │                        │
-                             SSE (poll → push, Faz 2) ◀─┘                 501 (henüz yok) / 202
+Browser ── /backend/* (Next rewrite, same-origin) ──▶ Spring Boot API ◀── /api/internal/** (worker callback)
+                          │                              │    ▲                 X-ARS-Internal-Token
+                CSRF cookie pattern (XSRF)              │    │                        │
+                                                          │    │              olay/durum/eleman/kanıt
+                                                          ▼    │                        │
+                                            PostgreSQL (Flyway)  MinIO (artifact blob'ları)
+                                                          ▲    │                        │
+                                              SSE (olaylar)  │                        │
+Browser worker ── gerçek Chromium: login → hazır bekleme → pasif keşif → screenshot/trace ──┘
 ```
+
+**Faz 2 eklentileri:**
+- **Worker → API callback kanalı:** `/api/internal/executions/{id}/events|status|elements|artifacts`
+  sabit-zamanlı token filtresiyle korunur; CSRF bu kanal için devre dışıdır (kanal token'la
+  kimlik doğrulur). Terminal durumlar idempotent'tir.
+- **Kanıt deposu:** byte'lar (screenshot PNG, Playwright trace zip, konsol logları) MinIO'da;
+  PostgreSQL yalnızca metadata (`artifact`) tutar. Panel içeriği oturumla kimlik doğrulanmış
+  `GET /artifacts/{id}/content` üzerinden akıtır.
+- **Keşif çıktısı:** `discovered_element` tablosunda normalize kayıtlar (etiket, tip, değer,
+  etkin/görünür/zorunlu, seçenekler, DOM yolu, güven skoru) — Faz 3'ün etkileşimli keşfi ve
+  Faz 5'in semantik eşlemesi bu kayıtları temel alır.
+- **Tarayıcı disiplini:** state-bazlı bekleme (`waitForSelector`/`waitForURL`), konfigüre
+  zaman aşımları, **rastgele sleep yok**; iş başına izole context; DOM içeriği yalnızca
+  veri olarak okunur.
 
 **Kritik kararlar:**
 
