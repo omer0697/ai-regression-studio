@@ -107,6 +107,17 @@ public class SecurityConfig {
         return registration;
     }
 
+    /** Phase 8: per-IP rate limiting (login/AI endpoints get a tighter cap). */
+    @Bean
+    public org.springframework.boot.web.servlet.FilterRegistrationBean<com.ars.api.security.RateLimitFilter> rateLimitFilter() {
+        var registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>(
+                new com.ars.api.security.RateLimitFilter());
+        registration.addUrlPatterns("/api/*");
+        registration.setOrder(org.springframework.core.Ordered.HIGHEST_PRECEDENCE + 100);
+        registration.setName("rateLimitFilter");
+        return registration;
+    }
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource(AppProperties properties) {
         CorsConfiguration configuration = new CorsConfiguration();

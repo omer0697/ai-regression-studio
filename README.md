@@ -176,14 +176,14 @@ docker run --rm -v "${PWD}\apps\api:/app" -v ars-maven-cache:/root/.m2 `
 
 | Faz | Kapsam | Durum |
 | --- | --- | --- |
-| 1 — Foundation | Monorepo, web/api/worker iskeletleri, auth+RBAC, proje/ortam/ekran yönetimi, çalıştırma API'si, SSE, altyapı, testler | ✅ Tamamlandı |
-| 2 — Browser Automation | Playwright yaşam döngüsü, izole context'ler, güvenli test girişi, GWT/React adaptörleri, pasif keşif, screenshot/trace/kanıt (MinIO), canlı ilerleme | ✅ Tamamlandı |
-| 3 — UI Discovery | Güvenli etkileşimli keşif, bağımlılık gözlemleri, keşif bütçeleri, locator adayları | ✅ Tamamlandı |
-| 4 — DeepSeek Agent | AI sağlayıcı, senaryo üretimi, semantik eşleme | Sırada |
-| 5 — Differential Engine | GWT ↔ React karşılaştırma, execute işleri, kanıt destekli bulgular | Planlandı |
-| 6 — Document Workflows | PDF üretim/karşılaştırma, imza, şifreleme | Planlandı |
-| 7 — Reporting | Hata paneli, yan yana kanıt, dışa aktarma | Planlandı |
-| 8 — Hardening | Güvenlik/performans/izolasyon sağlamlaştırma | Planlandı |
+| 1 — Foundation | Monorepo, web/api/worker iskeletleri, auth+RBAC, proje/ortam/ekran yönetimi, çalıştırma API'si, SSE, altyapı, testler | ✅ |
+| 2 — Browser Automation | Playwright yaşam döngüsü, izole context'ler, güvenli test girişi, GWT/React adaptörleri, pasif keşif, screenshot/trace/kanıt (MinIO), canlı ilerleme | ✅ |
+| 3 — UI Discovery | Güvenli etkileşimli keşif, bağımlılık gözlemleri, keşif bütçeleri, locator adayları | ✅ |
+| 4 — DeepSeek Agent | OpenAI-uyumlu adaptör, doğal dil plan üretimi, insan onay kapısı, dürüst AI_NOT_CONFIGURED | ✅ |
+| 5 — Differential Engine | GWT ↔ React karşılaştırma, eşleme, kanıt destekli bulgular, hata raporları | ✅ |
+| 6 — Document Workflows | PDFBox yapısal PDF karşılaştırma, sentetik PDF doğrulaması, imza/şifreleme dürüst durumu | ✅ |
+| 7 — Reporting | Özet/kırılım raporları, doğrulanmamış kapsam bölümü, JSON + PDF dışa aktarma | ✅ |
+| 8 — Hardening | Rate limiting, imza/şifreleme dürüst durumu, UTF-8 derleme, dokümantasyon | ✅ |
 
 Ayrıntılı durum: `docs/progress.md`.
 
