@@ -107,6 +107,20 @@ public final class InternalDtos {
             List<@Valid DiscoveredElementPayload> items) {
     }
 
+    /**
+     * Worker-submitted pair of real generated PDFs plus the form values that
+     * must appear in them. Payloads are base64 to keep the internal channel
+     * JSON-only; each document is capped at 25 MB after decoding.
+     */
+    public record InternalPdfCheckRequest(
+            @Size(max = 80) String screenCode,
+            @Size(max = 200) String gwtFileName,
+            @NotBlank String gwtPdfBase64,
+            @Size(max = 200) String reactFileName,
+            @NotBlank String reactPdfBase64,
+            @NotNull @Size(min = 1, max = 300) java.util.Map<String, String> expectedFields) {
+    }
+
     public record ArtifactResponse(
             Long id,
             Long executionId,

@@ -68,7 +68,8 @@ public class AiAnalysisService {
                     executionId, execution.getProjectId(), "FAILURE_ANALYSIS", null,
                     "AI_NOT_CONFIGURED", "AI sağlayıcısı yapılandırılmadı.", null));
             throw ApiException.conflict("AI_NOT_CONFIGURED",
-                    "The AI provider is not configured. Set AI_BASE_URL, AI_MODEL and AI_API_KEY.");
+                    "The AI provider is not configured. Set AI_BASE_URL and AI_MODEL "
+                            + "(AI_API_KEY is optional for company-hosted local LLMs).");
         }
 
         String elements = elementRepository

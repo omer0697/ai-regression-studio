@@ -42,7 +42,7 @@ export default function AiDiscoveryPage() {
       const apiError = caught instanceof ApiError ? caught : null;
       if (apiError?.code === "AI_NOT_CONFIGURED") {
         setError(
-          "AI sağlayıcısı yapılandırılmadı. AI Ayarları sayfasındaki ortam değişkenlerini (AI_BASE_URL, AI_MODEL, AI_API_KEY) ayarlayın.",
+          "AI sağlayıcısı yapılandırılmadı. AI Ayarları sayfasından Local LLM URL ve model adını tanımlayın.",
         );
       } else if (apiError?.code === "NO_DISCOVERY_DATA") {
         setError(

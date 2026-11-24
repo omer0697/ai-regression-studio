@@ -137,6 +137,14 @@ export default function ExecutionDetailPage() {
                 Rapor (JSON)
               </a>
               <a
+                className="inline-flex h-9 items-center rounded-lg border border-info/40 bg-info/10 px-4 text-sm font-medium text-info hover:bg-info/20"
+                href={`${reportBase}/report.md`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Hata Raporu (.md)
+              </a>
+              <a
                 className="inline-flex h-9 items-center rounded-lg border border-border-subtle bg-surface-2 px-4 text-sm font-medium hover:bg-surface-2/70"
                 href={`${reportBase}/report.pdf`}
                 target="_blank"

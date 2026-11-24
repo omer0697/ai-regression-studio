@@ -107,12 +107,14 @@ public class AiClient {
                         .build();
                 var requestFactory = new JdkClientHttpRequestFactory(httpClient);
                 requestFactory.setReadTimeout(Duration.ofSeconds(config.timeoutSeconds()));
-                cachedClient = RestClient.builder()
+                var builder = RestClient.builder()
                         .baseUrl(config.baseUrl())
                         .requestFactory(requestFactory)
-                        .defaultHeader("Authorization", "Bearer " + config.apiKey())
-                        .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
-                        .build();
+                        .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE);
+                if (config.apiKey() != null && !config.apiKey().isBlank()) {
+                    builder.defaultHeader("Authorization", "Bearer " + config.apiKey());
+                }
+                cachedClient = builder.build();
                 cachedClientKey = key;
             }
             return cachedClient;

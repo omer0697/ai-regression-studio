@@ -25,7 +25,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input, Select } from "@/components/ui/input";
+import { Input, Select, Textarea } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Table,
@@ -35,7 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { API_BASE, WORKER_BASE, api, artifactContentUrl, type ScenarioInfo } from "@/lib/api-client";
+import { API_BASE, WORKER_BASE, api, artifactContentUrl, type RequirementInfo, type ScenarioInfo } from "@/lib/api-client";
 import {
   useAiStatus,
   useBrowserSessions,
@@ -111,6 +111,27 @@ export default function ScreenTestStudioPage() {
   // ---- Live Iframe Preview State ----
   const [showIframePreview, setShowIframePreview] = useState(true);
   const [iframeRefreshKey, setIframeRefreshKey] = useState(0);
+  const [checkPdfFields, setCheckPdfFields] = useState(true);
+  const [checkDocumentWorkflows, setCheckDocumentWorkflows] = useState(false);
+
+  // ---- Confluence New Development / Requirement Check State ----
+  const [confluenceBaseUrl, setConfluenceBaseUrl] = useState("");
+  const [confluencePageId, setConfluencePageId] = useState("");
+  const [confluenceToken, setConfluenceToken] = useState("");
+  const [confluenceRawContent, setConfluenceRawContent] = useState("");
+  const [isCheckingConfluence, setIsCheckingConfluence] = useState(false);
+  const [confluenceResult, setConfluenceResult] = useState<{
+    imported: number;
+    analyzed: number;
+    totalRequirements: number;
+    verifiedCount: number;
+    missingOrReviewCount: number;
+  } | null>(null);
+  const [confluenceRequirements, setConfluenceRequirements] = useState<RequirementInfo[]>([]);
+
+  // ---- Markdown Bug Report State ----
+  const [markdownReport, setMarkdownReport] = useState<string | null>(null);
+  const [isLoadingMarkdown, setIsLoadingMarkdown] = useState(false);
 
   // ---- Active Execution State ----
   const [activeExecutionId, setActiveExecutionId] = useState<number | null>(null);
@@ -234,9 +255,14 @@ export default function ScreenTestStudioPage() {
   };
 
   // ---- One-Click Auto Provision & Start Execution ----
-  const onStartStudioTest = async () => {
+  const onStartStudioTest = async (
+    modeOverride?: "COMPARISON" | "DISCOVERY" | "COMBINATION",
+  ) => {
+    const runMode = modeOverride ?? mode;
     setLaunchError(null);
     setSessionMessage(null);
+    setMarkdownReport(null);
+    setGeneratedScenario(null);
 
     const normalizedCode = screenCode
       .trim()
@@ -252,9 +278,9 @@ export default function ScreenTestStudioPage() {
     try {
       // 1) Find or create the Studio Project
       const currentProjects = projects ?? (await api.listProjects());
-      let studioProject =
-        currentProjects.find((p) => p.active && p.name === "GWT-React Test Stüdyosu") ??
-        currentProjects.find((p) => p.active);
+      let studioProject = currentProjects.find(
+        (p) => p.active && p.name === "GWT-React Test Stüdyosu",
+      );
 
       if (!studioProject) {
         const created = await api.createProject({
@@ -268,6 +294,21 @@ export default function ScreenTestStudioPage() {
 
       const projectId = studioProject.id;
       const existingEnvs = await api.listEnvironments(projectId);
+
+      const documentActions = [
+        "safe-exploration",
+        ...(checkPdfFields ? ["document-pdf-testing"] : []),
+        ...(checkDocumentWorkflows ? ["document-workflow-testing"] : []),
+      ];
+      const gwtAllowedActions = [
+        ...documentActions,
+        ...(gwtAuthMode === "MANUAL_INTERACTIVE" ? ["manual-interactive-login"] : []),
+      ];
+      // "İmzaya Gönder"/"Yayınla" are only permitted when the operator opted in
+      // to document-workflow testing; otherwise they stay explicitly forbidden.
+      const prohibitedActions = checkDocumentWorkflows
+        ? ["delete"]
+        : ["submit", "publish", "delete", "approve", "sign", "send"];
 
       // 2) Upsert GWT Environment
       const gwtEnvPayload: Record<string, unknown> = {
@@ -294,11 +335,8 @@ export default function ScreenTestStudioPage() {
           gwtAuthMode === "TEST_ACCOUNT_FORM" ? gwtPassSelector.trim() : undefined,
         submitSelector:
           gwtAuthMode === "TEST_ACCOUNT_FORM" ? gwtSubmitSelector.trim() : undefined,
-        allowedActions:
-          gwtAuthMode === "MANUAL_INTERACTIVE"
-            ? ["safe-exploration", "manual-interactive-login"]
-            : ["safe-exploration"],
-        prohibitedActions: ["submit", "publish", "delete", "approve", "sign", "send"],
+        allowedActions: gwtAllowedActions,
+        prohibitedActions,
         browserTimeoutMs: 45000,
         explorationMaxInteractions: 12,
         explorationMaxOptions: 3,
@@ -313,7 +351,7 @@ export default function ScreenTestStudioPage() {
       }
 
       // 3) Upsert React Environment (when COMPARISON or COMBINATION)
-      if (mode === "COMPARISON" || mode === "COMBINATION") {
+      if (runMode === "COMPARISON" || runMode === "COMBINATION") {
         const reactEnvPayload: Record<string, unknown> = {
           appType: "REACT",
           displayName: "React Uygulaması",
@@ -330,11 +368,11 @@ export default function ScreenTestStudioPage() {
             reactAuthMode === "MANUAL_INTERACTIVE"
               ? reactLoginUrl.trim() || reactBaseUrl.trim()
               : undefined,
-          allowedActions:
-            reactAuthMode === "MANUAL_INTERACTIVE"
-              ? ["safe-exploration", "manual-interactive-login"]
-              : ["safe-exploration"],
-          prohibitedActions: ["submit", "publish", "delete", "approve", "sign", "send"],
+          allowedActions: [
+            ...documentActions,
+            ...(reactAuthMode === "MANUAL_INTERACTIVE" ? ["manual-interactive-login"] : []),
+          ],
+          prohibitedActions,
           browserTimeoutMs: 45000,
           explorationMaxInteractions: 12,
           explorationMaxOptions: 3,
@@ -375,7 +413,7 @@ export default function ScreenTestStudioPage() {
       setAiError(null);
       const started = await api.startExecution(projectId, {
         screenId: targetScreen.id,
-        mode,
+        mode: runMode,
       });
       setActiveExecutionId(started.id);
     } catch (error) {
@@ -426,6 +464,67 @@ export default function ScreenTestStudioPage() {
       );
     } finally {
       setIsAnalyzingAi(false);
+    }
+  };
+
+  const onCheckConfluence = async () => {
+    setAiError(null);
+    const projectId = activeProjectId ?? execution?.projectId;
+    const normalizedCode = screenCode.trim().toUpperCase();
+    if (!projectId || !normalizedCode) {
+      setAiError("Confluence kontrolü için önce bu ekranı bir kez çalıştırın veya keşfedin.");
+      return;
+    }
+    if (
+      !confluenceRawContent.trim() &&
+      (!confluenceBaseUrl.trim() || !confluencePageId.trim())
+    ) {
+      setAiError("Confluence sayfa URL'si + sayfa ID'si veya yeni geliştirme metni girin.");
+      return;
+    }
+
+    setIsCheckingConfluence(true);
+    try {
+      const result = await api.checkConfluenceDevelopments(projectId, normalizedCode, {
+        confluenceBaseUrl: confluenceBaseUrl.trim() || undefined,
+        confluencePageId: confluencePageId.trim() || undefined,
+        confluenceToken: confluenceToken.trim() || undefined,
+        rawContent: confluenceRawContent.trim() || undefined,
+      });
+      setConfluenceResult(result);
+      setConfluenceRequirements(await api.listRequirements(projectId, normalizedCode));
+    } catch (error) {
+      setAiError(
+        error instanceof Error
+          ? error.message
+          : "Confluence yeni geliştirme kontrolü başarısız oldu.",
+      );
+    } finally {
+      setIsCheckingConfluence(false);
+    }
+  };
+
+  const onLoadMarkdownReport = async () => {
+    if (!activeExecutionId) return;
+    setIsLoadingMarkdown(true);
+    try {
+      setMarkdownReport(await api.getMarkdownReport(activeExecutionId));
+    } catch (error) {
+      setAiError(
+        error instanceof Error ? error.message : "Markdown raporu yüklenemedi.",
+      );
+    } finally {
+      setIsLoadingMarkdown(false);
+    }
+  };
+
+  const onCopyMarkdownReport = async () => {
+    if (!markdownReport) return;
+    try {
+      await navigator.clipboard.writeText(markdownReport);
+      setSessionMessage("Markdown hata raporu panoya kopyalandı.");
+    } catch {
+      setAiError("Panoya kopyalama izni verilmedi. Raporu ekrandan seçerek kopyalayabilirsiniz.");
     }
   };
 
@@ -939,6 +1038,45 @@ export default function ScreenTestStudioPage() {
             </p>
           ) : null}
 
+          <div className="flex flex-col gap-2 rounded-lg border border-border-subtle bg-surface-2/40 p-3">
+            <div className="flex flex-wrap items-center gap-5 text-sm">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-border-subtle bg-surface"
+                  checked={checkPdfFields}
+                  onChange={(event) => setCheckPdfFields(event.target.checked)}
+                />
+                <span>
+                  <strong>Form → PDF alan kontrolü</strong>
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    (doldurulan alanların PDF çıktısında eksik/yanlış olup olmadığı)
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-border-subtle bg-surface"
+                  checked={checkDocumentWorkflows}
+                  onChange={(event) => setCheckDocumentWorkflows(event.target.checked)}
+                />
+                <span>
+                  <strong>İmzaya Gönder / Yayınla akışını da test et</strong>
+                  <span className="ml-1 text-xs text-warning">
+                    (yalnızca test ortamında; gerçek iş akışı tetikleyebilir)
+                  </span>
+                </span>
+              </label>
+            </div>
+            {checkDocumentWorkflows ? (
+              <p className="rounded-md border border-warning/40 bg-warning/10 px-2.5 py-1.5 text-xs text-warning">
+                Dikkat: Bu seçenek her iki uygulamada da “İmzaya Gönder” ve “Yayınla”
+                butonlarını gerçekten tıklar. Yalnızca izole test ortamında kullanın.
+              </p>
+            ) : null}
+          </div>
+
           {/* ---- ACTION BAR ---- */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -991,6 +1129,157 @@ export default function ScreenTestStudioPage() {
               {showIframePreview ? "Canlı İframe Önizlemeyi Gizle" : "Canlı İframe Önizlemeyi Göster"}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ---- CONFLUENCE NEW DEVELOPMENT & REQUIREMENT CHECK ---- */}
+      <Card className="border-info/40">
+        <CardHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <IconFileText className="text-info" />
+            <CardTitle>Confluence Yeni Geliştirme & Gereksinim Kontrolü</CardTitle>
+            {confluenceResult ? (
+              <Badge
+                tone={
+                  confluenceResult.missingOrReviewCount > 0 ? "warning" : "success"
+                }
+              >
+                {confluenceResult.missingOrReviewCount > 0
+                  ? `${confluenceResult.missingOrReviewCount} madde ekranda eksik / inceleme gerekli`
+                  : "Tüm maddeler ekranda doğrulandı"}
+              </Badge>
+            ) : null}
+          </div>
+          <CardDescription>
+            Confluence sayfasını canlı çekin veya yeni geliştirme maddelerini doğrudan
+            yapıştırın. Sistem bunları en son keşfedilen GWT/React ekran elemanlarıyla
+            karşılaştırır; eksik geliştirmeler Markdown raporuna da işlenir.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="confluence-base-url">Confluence Base URL</Label>
+              <Input
+                id="confluence-base-url"
+                className="font-mono text-xs"
+                placeholder="https://confluence.sirket.local"
+                value={confluenceBaseUrl}
+                onChange={(event) => setConfluenceBaseUrl(event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="confluence-page-id">Sayfa ID</Label>
+              <Input
+                id="confluence-page-id"
+                className="font-mono text-xs"
+                placeholder="123456"
+                value={confluencePageId}
+                onChange={(event) => setConfluencePageId(event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="confluence-token">Bearer Token (isteğe bağlı)</Label>
+              <Input
+                id="confluence-token"
+                type="password"
+                autoComplete="off"
+                className="font-mono text-xs"
+                placeholder="Sunucu ortam değişkeni varsa boş bırakın"
+                value={confluenceToken}
+                onChange={(event) => setConfluenceToken(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="confluence-raw-content">
+              Yeni Geliştirme / Gereksinim Maddeleri (her satırda bir madde)
+            </Label>
+            <Textarea
+              id="confluence-raw-content"
+              className="min-h-28 font-mono text-xs"
+              placeholder={"- KPY68 ekranına 'Son Geçerlilik Tarihi' alanı eklenecek.\n- İmzaya Gönder butonu zorunlu alanlar dolu olduğunda etkinleşmeli.\n- Oluşan PDF'te Açıklama ve Başlangıç Tarihi yer almalı."}
+              value={confluenceRawContent}
+              onChange={(event) => setConfluenceRawContent(event.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void onCheckConfluence()}
+              disabled={isCheckingConfluence || !activeProjectId}
+            >
+              <IconSparkles />
+              {isCheckingConfluence
+                ? "Confluence & Ekran Karşılaştırılıyor…"
+                : "Confluence Yeni Geliştirmeleri Kontrol Et"}
+            </Button>
+            {!activeProjectId ? (
+              <span className="text-xs text-muted-foreground">
+                Önce ekranı bir kez çalıştırın; karşılaştırma keşfedilen elemanları kullanır.
+              </span>
+            ) : null}
+            {confluenceResult ? (
+              <span className="text-xs text-muted-foreground">
+                {confluenceResult.imported} yeni madde import edildi ·{" "}
+                {confluenceResult.verifiedCount}/{confluenceResult.totalRequirements} doğrulandı
+              </span>
+            ) : null}
+          </div>
+
+          {confluenceRequirements.length > 0 ? (
+            <div className="max-h-72 overflow-y-auto rounded-xl border border-border-subtle">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Durum</TableHead>
+                    <TableHead>Confluence / Gereksinim Maddesi</TableHead>
+                    <TableHead>Eşleşen Ekran Elemanları</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {confluenceRequirements.map((requirement) => {
+                    const matched = requirement.coverage?.matchedElements;
+                    const verified = requirement.status === "VERIFIED";
+                    return (
+                      <TableRow key={requirement.id}>
+                        <TableCell>
+                          <Badge tone={verified ? "success" : "warning"}>
+                            {verified
+                              ? "Ekranda mevcut"
+                              : requirement.status === "PENDING"
+                                ? "Keşif bekliyor"
+                                : "Eksik / inceleme gerekli"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="max-w-xl text-xs">
+                          <p className="font-medium">{requirement.title}</p>
+                          {requirement.sourceUrl ? (
+                            <a
+                              href={requirement.sourceUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] text-primary hover:underline"
+                            >
+                              Confluence kaynağı ↗
+                            </a>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="max-w-sm font-mono text-[11px] text-muted-foreground">
+                          {Array.isArray(matched) && matched.length > 0
+                            ? matched.join(", ")
+                            : "Eşleşme yok"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -1104,6 +1393,23 @@ export default function ScreenTestStudioPage() {
               {reportBase ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <a
+                    href={`${reportBase}/report.md`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-info/40 bg-info/10 px-4 text-sm font-medium text-info hover:bg-info/20"
+                  >
+                    <IconFileText />
+                    Hata Raporu (.md İndir)
+                  </a>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => void onLoadMarkdownReport()}
+                    disabled={isLoadingMarkdown}
+                  >
+                    {isLoadingMarkdown ? "Yükleniyor…" : "Markdown Raporunu Gör"}
+                  </Button>
+                  <a
                     href={`${reportBase}/report.pdf`}
                     target="_blank"
                     rel="noreferrer"
@@ -1163,6 +1469,27 @@ export default function ScreenTestStudioPage() {
                   }
                 />
               </div>
+
+              {markdownReport ? (
+                <div className="flex flex-col gap-2 rounded-xl border border-info/40 bg-info/5 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-info">
+                      Geliştiriciye Yönelik Markdown Hata & Fark Raporu
+                    </h3>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void onCopyMarkdownReport()}
+                    >
+                      Markdown Panoya Kopyala
+                    </Button>
+                  </div>
+                  <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border-subtle bg-surface p-3 font-mono text-[11px] leading-relaxed">
+                    {markdownReport}
+                  </pre>
+                </div>
+              ) : null}
 
               {/* ---- LOCAL LLM (AI) TEST CASE GENERATOR & ROOT CAUSE ANALYZER ---- */}
               <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
@@ -1235,10 +1562,7 @@ export default function ScreenTestStudioPage() {
                       </div>
                       <Button
                         size="sm"
-                        onClick={() => {
-                          setMode("COMPARISON");
-                          void onStartStudioTest();
-                        }}
+                        onClick={() => void onStartStudioTest("COMPARISON")}
                         disabled={isLaunching}
                       >
                         <IconPlay />
@@ -1341,6 +1665,34 @@ export default function ScreenTestStudioPage() {
                             {shot.displayName}
                           </figcaption>
                         </figure>
+                      ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Generated PDF Evidence (real downloads captured by the worker) */}
+              {artifacts && artifacts.filter((a) => a.artifactType === "PDF").length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Üretilen PDF Kanıtları (form → PDF doğrulaması)
+                  </h3>
+                  <div className="flex flex-wrap gap-3">
+                    {artifacts
+                      .filter((a) => a.artifactType === "PDF")
+                      .map((pdf) => (
+                        <a
+                          key={pdf.id}
+                          href={artifactContentUrl(pdf.id)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 rounded-lg border border-info/40 bg-info/10 px-3 py-2 text-xs font-medium text-info hover:bg-info/20"
+                        >
+                          <IconFileText />
+                          {pdf.displayName}
+                          <span className="font-mono text-[11px] opacity-80">
+                            ({Math.round((pdf.byteSize ?? 0) / 1024)} KB)
+                          </span>
+                        </a>
                       ))}
                   </div>
                 </div>

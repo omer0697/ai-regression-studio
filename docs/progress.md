@@ -5,6 +5,66 @@ komut çıktılarıyla desteklenir; doğrulanmamış hiçbir şey "tamamlandı" 
 
 ---
 
+## Faz 10 — Belge Akışı, PDF Doğrulaması & Confluence Kontrolü ✅ (24 Kasım 2026)
+
+### Tamamlananlar
+
+- **Gerçek PDF yakalama:** Worker artık "PDF Oluştur" tetikleyicisini Playwright ile
+  tıklar ve uygulamanın ürettiği gerçek dosyayı yakalar — indirme (`download`),
+  yeni sekme (`popup`, blob/http PDF) ve gömülü `embed/object/iframe` yedekleri.
+  Yakalanan dosya `PDF` türünde kanıt olarak API'ye yüklenir ve arayüzde
+  "Üretilen PDF Kanıtları" altında açılabilir.
+- **Form → PDF eksik alan doğrulaması:** Doldurulan form alanları (etiket + değer)
+  sayfadan/iframe'lerden çıkarılır; her iki PDF de sunucuda Apache PDFBox ile
+  ayrıştırılır. `POST /api/internal/executions/{id}/pdf-check` uç noktası sayfa
+  sayısı, eksik alan ve hatalı değer farklarını döndürür; worker bunları
+  `PDF_FIELD_MISSING` / `VALUE_MISMATCH` bulgularına çevirir. PDF üretmeyen taraf
+  ayrıca yüksek önemde bulgu olarak raporlanır.
+- **İmzaya Gönder / Yayınla akış testi (açık onaylı):** Stüdyoda işaretlenmediği
+  sürece bu düğmeler `prohibitedActions` içinde kalır. İşaretlendiğinde worker her
+  iki uygulamada düğmeleri gerçekten tıklar, durum kutusu/alert/dialog metnini
+  okur ve durum farkını `WORKFLOW_MISMATCH` olarak raporlar. Arayüzde test ortamı
+  uyarısı gösterilir.
+- **Confluence yeni geliştirme kontrolü:** Stüdyodan Base URL + Sayfa ID + isteğe
+  bağlı Bearer Token ile canlı çekim veya doğrudan yapıştırılan maddeler içe
+  aktarılır; en son keşfedilen GWT/React elemanlarıyla eşleştirilir. Eksik/inceleme
+  gerektiren maddeler tabloda ve Markdown raporunda listelenir.
+- **Geliştirici Markdown raporu:** `report.md` uç noktası; Stüdyo ve çalıştırma
+  detayında görüntüleme, panoya kopyalama ve indirme. Rapor; her bulgunun GWT
+  beklenen / React gerçekleşen davranışını, olası kök nedeni, PDF/iş akışı ve
+  Confluence kapsamını içerir. Sunucuda `data/reports/BUG-REPORT-*.md` kopyası
+  bırakılır.
+- **Anahtarsız yerel LLM:** `AI_API_KEY` artık isteğe bağlı; yalnızca
+  `AI_BASE_URL` + `AI_MODEL` (veya AI Ayarları ekranı) yeterli. `Authorization`
+  başlığı yalnızca anahtar varsa gönderilir.
+- **Test adımlarının iki uygulamada yürütülmesi:** Onaylanmış senaryo planı GWT ve
+  React üzerinde sırayla çalıştırılır; `assert*` adımları gerçek DOM durumuna göre
+  doğrulanır. `downloadPdf` adımı artık PDF'yi iki kez tetiklemez; üretim plan
+  sonunda tek kez yapılır.
+
+### Doğrulama
+
+- `npm run typecheck` → 4 workspace temiz.
+- `npx vitest run` (browser-worker) → **5 dosya, 19 test geçti** (yeni
+  `plan-executor.test.ts`: gerçek PDF indirmesi, form alanları ve iki iş akışı
+  durumu; yeni karşılaştırma testi: fixture'larda eksik PDF alanları ve
+  İmzaya Gönder farkı).
+- `mvn -f apps/api/pom.xml -B test` → **41 Java testi geçti** (yeni
+  `InternalExecutionControllerTest`: base64 PDF çözme, PDFBox delegeleme,
+  geçersiz payload ve doğrulama hataları;
+  `-DargLine=-Duser.language=en -Duser.country=US` yalnızca bu makinedeki
+  IntelliJ JBR fork sorunu için gerekli).
+
+### Dürüst sınırlamalar
+
+- PDFBox metin tabanlı PDF'lerde çalışır; taranmış/görüntü PDF'ler için OCR yoktur.
+- Gerçek KAP uçlarına karşı uçtan uca çalıştırma kurumsal kimlik bilgileri
+  sağlandığında yapılmalıdır; bu faz fixture'lar ve birim testleriyle doğrulandı.
+- "İmzaya Gönder"/"Yayınla" gerçek iş akışı tetikleyebilir; yalnızca izole test
+  ortamında ve açık onayla kullanılmalıdır.
+
+---
+
 ## Faz 9 — Yerel Çalıştırma & Yönetim Deneyimi ✅ (21 Kasım 2026)
 
 ### Tamamlananlar

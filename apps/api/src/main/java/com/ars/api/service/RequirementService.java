@@ -13,6 +13,7 @@ import com.ars.api.domain.entity.DiscoveredElement;
 import com.ars.api.domain.entity.RequirementDefinition;
 import com.ars.api.domain.repository.DiscoveredElementRepository;
 import com.ars.api.domain.repository.RequirementDefinitionRepository;
+import com.ars.api.domain.repository.ScreenDefinitionRepository;
 import com.ars.api.domain.repository.TestExecutionRepository;
 import com.ars.api.web.ApiException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -36,6 +37,7 @@ public class RequirementService {
     private final RequirementDefinitionRepository repository;
     private final DiscoveredElementRepository elementRepository;
     private final TestExecutionRepository executionRepository;
+    private final ScreenDefinitionRepository screenRepository;
     private final ObjectMapper objectMapper;
 
     public RequirementService(
@@ -43,11 +45,13 @@ public class RequirementService {
             RequirementDefinitionRepository repository,
             DiscoveredElementRepository elementRepository,
             TestExecutionRepository executionRepository,
+            ScreenDefinitionRepository screenRepository,
             ObjectMapper objectMapper) {
         this.properties = properties;
         this.repository = repository;
         this.elementRepository = elementRepository;
         this.executionRepository = executionRepository;
+        this.screenRepository = screenRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -273,7 +277,11 @@ public class RequirementService {
     }
 
     private boolean screenCodeMatches(Long screenId, String screenCode) {
-        return screenId != null && screenCode != null;
+        return screenId != null
+                && screenCode != null
+                && screenRepository.findById(screenId)
+                        .map(screen -> screen.getScreenCode().equalsIgnoreCase(screenCode))
+                        .orElse(false);
     }
 
     /** Splits storage text into requirement entries (list items / paragraphs). */

@@ -168,6 +168,44 @@ describe("ComparisonRunner — differential engine against injected defects", ()
     expect(summary?.message).toContain("behavioral difference(s) detected");
   }, 240_000);
 
+  it("reports missing generated-PDF fields and Send-to-Sign/Publish workflow differences when opted in", async () => {
+    const runner = new ComparisonRunner(browser, loadCredentialStore(config));
+    const reporter = new RecordingReporter();
+
+    const job = comparisonJob();
+    job.legacyApp.allowedActions = [
+      "safe-exploration",
+      "document-pdf-testing",
+      "document-workflow-testing",
+    ];
+    job.reactApp.allowedActions = [
+      "safe-exploration",
+      "document-pdf-testing",
+      "document-workflow-testing",
+    ];
+    job.plan = {
+      scenarioName: "Document workflow comparison",
+      screen: "KPY68",
+      steps: [{ action: "wait", value: "auto-explore" }],
+    };
+
+    await runner.run(job, reporter as unknown as ExecutionReporter);
+
+    expect(reporter.statuses.at(-1)?.status).toBe("COMPLETED");
+    const findings = reporter.findingBatches.at(0) ?? [];
+    const titles = findings.map((finding) => finding.title).join("\n");
+    const categories = findings.map((finding) => finding.category);
+
+    // Fixture deliberately omits "Açıklama" and "Başlangıç Tarihi" in React PDF.
+    expect(categories).toContain("PDF_FIELD_MISSING");
+    expect(titles).toContain("Açıklama");
+    expect(titles).toContain("Başlangıç Tarihi");
+
+    // Fixture leaves React "İmzaya Gönder" in IMZA_SERVISI_EKSIK.
+    expect(categories).toContain("WORKFLOW_MISMATCH");
+    expect(titles).toContain("İmzaya Gönder");
+  }, 240_000);
+
   it("auto-explores and compares GWT vs React screens embedded inside nested <iframe> shells", async () => {
     const runner = new ComparisonRunner(browser, loadCredentialStore(config));
     const reporter = new RecordingReporter();

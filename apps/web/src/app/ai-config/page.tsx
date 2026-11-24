@@ -92,7 +92,7 @@ function SettingsForm({
         kind: "error",
         detail:
           apiError?.code === "AI_CONFIG_INCOMPLETE"
-            ? "AI'ı etkinleştirmek için temel URL, model ve API anahtarı zorunludur."
+            ? "AI'ı etkinleştirmek için temel URL ve model adı zorunludur."
             : (apiError?.message ?? "Ayarlar kaydedilemedi."),
       });
     }

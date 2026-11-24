@@ -28,7 +28,7 @@ public class BugFindingService {
 
     private static final Set<String> CATEGORIES = Set.of(
             "FIELD_MISSING", "STATE_MISMATCH", "VALUE_MISMATCH", "DEPENDENCY_MISMATCH",
-            "TABLE_MISMATCH");
+            "TABLE_MISMATCH", "PDF_FIELD_MISSING", "WORKFLOW_MISMATCH", "ASSERTION_MISMATCH");
     private static final Set<String> SEVERITIES = Set.of("HIGH", "MEDIUM", "LOW");
 
     private final BugFindingRepository repository;

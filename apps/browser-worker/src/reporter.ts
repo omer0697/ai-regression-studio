@@ -10,6 +10,21 @@ export interface StatusUpdate {
   skippedSteps?: number;
 }
 
+export interface PdfCheckDifference {
+  kind: string;
+  field: string;
+  expected: string | null;
+  actual: string | null;
+  page: number | null;
+}
+
+export interface PdfCheckResult {
+  verdict: string;
+  pagesA: number;
+  pagesB: number;
+  differences: PdfCheckDifference[];
+}
+
 /**
  * Reports execution progress back to the Spring API over the internal
  * callback channel (authenticated with the shared internal token).
@@ -94,6 +109,50 @@ export class ExecutionReporter {
         items: records,
       }),
     );
+  }
+
+  /**
+   * Sends the two real PDFs produced by the applications to the API, where
+   * PDFBox extracts their text and verifies every filled form field against
+   * the generated documents.
+   */
+  async pdfCheck(payload: {
+    screenCode: string;
+    gwtFileName: string;
+    gwtPdfBase64: string;
+    reactFileName: string;
+    reactPdfBase64: string;
+    expectedFields: Record<string, string>;
+  }): Promise<PdfCheckResult | null> {
+    const path = `/api/internal/executions/${this.executionId}/pdf-check`;
+    const attempt = async (): Promise<PdfCheckResult | null> => {
+      const response = await fetch(`${this.apiBaseUrl}${path}`, {
+        method: "POST",
+        headers: {
+          "X-ARS-Internal-Token": this.internalToken,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error(`PDF check failed: HTTP ${response.status}`);
+      }
+      return (await response.json()) as PdfCheckResult;
+    };
+    try {
+      return await attempt();
+    } catch (error) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      try {
+        return await attempt();
+      } catch (retryError) {
+        console.warn(
+          "[reporter] PDF check failed after retry:",
+          (retryError as Error).message,
+        );
+        return null;
+      }
+    }
   }
 
   private async call(method: string, path: string, body: unknown) {

@@ -223,7 +223,13 @@ export interface DiscoveredElementListResponse {
   items: DiscoveredElementRecord[];
 }
 
-export const ARTIFACT_TYPES = ["SCREENSHOT", "TRACE", "CONSOLE_LOG", "NETWORK_LOG"] as const;
+export const ARTIFACT_TYPES = [
+  "SCREENSHOT",
+  "TRACE",
+  "CONSOLE_LOG",
+  "NETWORK_LOG",
+  "PDF",
+] as const;
 export type ArtifactType = (typeof ARTIFACT_TYPES)[number];
 
 export interface ArtifactInfo {

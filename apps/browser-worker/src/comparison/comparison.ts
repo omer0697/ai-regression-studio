@@ -24,7 +24,10 @@ export interface ComparisonFinding {
     | "STATE_MISMATCH"
     | "VALUE_MISMATCH"
     | "DEPENDENCY_MISMATCH"
-    | "TABLE_MISMATCH";
+    | "TABLE_MISMATCH"
+    | "PDF_FIELD_MISSING"
+    | "WORKFLOW_MISMATCH"
+    | "ASSERTION_MISMATCH";
   severity: "HIGH" | "MEDIUM" | "LOW";
   title: string;
   legacyRef: string;
@@ -145,7 +148,7 @@ export class ComparisonRunner {
           ...legacyElements.map((el) => ({ ...el, appType: job.legacyApp.appType })),
           ...reactElements.map((el) => ({
             ...el,
-            ref: `r_${el.ref}`,
+            ref: `react-${el.ref}`,
             appType: job.reactApp.appType,
           })),
         ]);
@@ -188,10 +191,28 @@ export class ComparisonRunner {
           )
         : rawSteps;
 
+      const documentChecksEnabled =
+        job.legacyApp.allowedActions.includes("document-pdf-testing") ||
+        steps.some((step) => step.action === "downloadPdf");
+      const workflowChecksEnabled =
+        job.legacyApp.allowedActions.includes("document-workflow-testing");
+
+      // Safety gate: even an approved plan must not click "İmzaya Gönder" /
+      // "Yayınla" unless the operator explicitly opted into workflow testing.
+      const executionSteps = workflowChecksEnabled
+        ? steps
+        : steps.filter((step) => !isWorkflowTriggerStep(step, legacyElements));
+      if (executionSteps.length !== steps.length) {
+        await reporter.event(
+          "INFO",
+          `Skipped ${steps.length - executionSteps.length} workflow trigger step(s): document-workflow-testing is not enabled.`,
+        );
+      }
+
       if (isAutoExplore) {
         await reporter.event(
           "INFO",
-          `Auto-derived ${steps.length} interactive step(s) from GWT controls for comparison.`,
+          `Auto-derived ${executionSteps.length} interactive step(s) from GWT controls for comparison.`,
         );
       }
 
@@ -202,12 +223,15 @@ export class ComparisonRunner {
         timeoutMs,
       );
       const legacyAfter = await legacyExecutor.execute(
-        steps,
+        executionSteps,
         legacyElements,
         (legacyRef) => legacyRef,
         (message) => reporter.event("STEP", `[GWT] ${message}`),
       );
-      const legacyDoc = await legacyExecutor.inspectDocumentAndWorkflows();
+      const legacyDoc = await legacyExecutor.inspectDocumentAndWorkflows({
+        includePdf: documentChecksEnabled,
+        includeWorkflows: workflowChecksEnabled,
+      });
 
       await reporter.event("INFO", "Executing the same plan in the React application.");
       const reactExecutor = new PlanExecutor(
@@ -216,12 +240,15 @@ export class ComparisonRunner {
         timeoutMs,
       );
       const reactAfter = await reactExecutor.execute(
-        steps,
+        executionSteps,
         reactElements,
         (legacyRef) => mapByLegacy.get(legacyRef)?.reactRef ?? legacyRef,
         (message) => reporter.event("STEP", `[React] ${message}`),
       );
-      const reactDoc = await reactExecutor.inspectDocumentAndWorkflows();
+      const reactDoc = await reactExecutor.inspectDocumentAndWorkflows({
+        includePdf: documentChecksEnabled,
+        includeWorkflows: workflowChecksEnabled,
+      });
 
       const legacyFinalScreenshot = await legacyPage.screenshot({ fullPage: true, type: "png" });
       await reporter.artifact(
@@ -314,71 +341,271 @@ export class ComparisonRunner {
           const reactChange = reactDelta.find(
             (candidate) => candidate.attribute === legacyChange.attribute,
           );
-            if (!reactChange) {
-              findings.push(
-                finding(
-                  "DEPENDENCY_MISMATCH",
-                  "HIGH",
-                  `Bağımlılık davranışı farkı: ${pair.legacyLabel ?? pair.legacyRef}`,
-                  pair,
-                  legacyChange.attribute,
-                  `GWT: plan uygulandığında ${legacyChange.attribute} → ${
-                    legacyChange.afterValue ?? "—"
-                  }.`,
-                  `React: plan uygulandığında alan değişmedi (${
-                    String(reactBefore[keyOf(legacyChange.attribute)] ?? "—")
-                  }).`,
-                ),
-              );
-            }
+          if (!reactChange) {
+            findings.push(
+              finding(
+                "DEPENDENCY_MISMATCH",
+                "HIGH",
+                `Bağımlılık davranışı farkı: ${pair.legacyLabel ?? pair.legacyRef}`,
+                pair,
+                legacyChange.attribute,
+                `GWT: plan uygulandığında ${legacyChange.attribute} → ${
+                  legacyChange.afterValue ?? "—"
+                }.`,
+                `React: plan uygulandığında alan değişmedi (${
+                  String(reactBefore[keyOf(legacyChange.attribute)] ?? "—")
+                }).`,
+              ),
+            );
           }
         }
+      }
 
-        // ---- Form-to-PDF Missing Field & Document Workflow Verification -----
-        if (legacyDoc.pdfAvailable && Object.keys(legacyDoc.pdfFields).length > 0) {
-          for (const [fieldName, gwtPdfVal] of Object.entries(legacyDoc.pdfFields)) {
-            if (!(fieldName in reactDoc.pdfFields)) {
-              const matchedPair =
-                mapping.find((p) => p.legacyLabel === fieldName) ?? {
+      // ---- Real assert* step verification (both applications) --------------
+      for (const failure of legacyExecutor.assertionFailures) {
+        findings.push({
+          category: "ASSERTION_MISMATCH",
+          severity: "HIGH",
+          title: `GWT test adımı doğrulaması başarısız: ${failure.stepAction} / ${failure.targetRef}`,
+          legacyRef: failure.targetRef,
+          legacyLabel: null,
+          reactRef: mapByLegacy.get(failure.targetRef)?.reactRef ?? null,
+          reactLabel: mapByLegacy.get(failure.targetRef)?.reactLabel ?? null,
+          attribute: "value",
+          expectedBehavior: `Test adımı bekleniyordu: ${failure.expected}`,
+          actualBehavior: `GWT ekranında gerçekleşen: ${failure.actual}`,
+        });
+      }
+      for (const failure of reactExecutor.assertionFailures) {
+        const pair = mapping.find((candidate) => candidate.reactRef === failure.targetRef);
+        findings.push({
+          category: "ASSERTION_MISMATCH",
+          severity: "HIGH",
+          title: `React test adımı doğrulaması başarısız: ${failure.stepAction} / ${failure.targetRef}`,
+          legacyRef: pair?.legacyRef ?? failure.targetRef,
+          legacyLabel: pair?.legacyLabel ?? null,
+          reactRef: failure.targetRef,
+          reactLabel: pair?.reactLabel ?? null,
+          attribute: "value",
+          expectedBehavior: `Test adımı bekleniyordu: ${failure.expected}`,
+          actualBehavior: `React ekranında gerçekleşen: ${failure.actual}`,
+        });
+      }
+
+      // ---- Form-to-PDF Missing/Incorrect Field Verification (once) ---------
+      if (documentChecksEnabled && legacyDoc.pdfAvailable && reactDoc.pdfAvailable) {
+        const pdfFieldNames = new Set([
+          ...Object.keys(legacyDoc.pdfFields),
+          ...Object.keys(reactDoc.pdfFields),
+        ]);
+        for (const fieldName of pdfFieldNames) {
+          const gwtPdfValue = legacyDoc.pdfFields[fieldName];
+          const reactPdfValue = reactDoc.pdfFields[fieldName];
+          const pair =
+            mapping.find((candidate) => candidate.legacyLabel === fieldName) ?? {
+              legacyRef: "pdf",
+              legacyLabel: fieldName,
+              reactRef: null,
+              reactLabel: null,
+              confidence: 1,
+            };
+          if (gwtPdfValue !== undefined && reactPdfValue === undefined) {
+            findings.push(
+              finding(
+                "PDF_FIELD_MISSING",
+                "HIGH",
+                `Oluşturulan PDF çıktısında eksik alan: ${fieldName}`,
+                pair,
+                "value",
+                `GWT PDF çıktısında '${fieldName}: ${gwtPdfValue || "—"}' alanı yer alıyor.`,
+                `React PDF çıktısında '${fieldName}' alanı hiç oluşturulmadı (PDF şablonunda eksik).`,
+              ),
+            );
+          } else if (
+            gwtPdfValue !== undefined &&
+            reactPdfValue !== undefined &&
+            gwtPdfValue !== reactPdfValue
+          ) {
+            findings.push(
+              finding(
+                "VALUE_MISMATCH",
+                "HIGH",
+                `PDF çıktısında alan değeri farkı: ${fieldName}`,
+                pair,
+                "value",
+                `GWT PDF: '${fieldName}: ${gwtPdfValue || "—"}'`,
+                `React PDF: '${fieldName}: ${reactPdfValue || "—"}'`,
+              ),
+            );
+          } else if (gwtPdfValue === undefined && reactPdfValue !== undefined) {
+            findings.push(
+              finding(
+                "PDF_FIELD_MISSING",
+                "MEDIUM",
+                `React PDF çıktısında GWT'de olmayan ek alan: ${fieldName}`,
+                pair,
+                "value",
+                "GWT PDF çıktısında bu alan bulunmuyor.",
+                `React PDF çıktısında '${fieldName}: ${reactPdfValue || "—"}' alanı üretildi.`,
+              ),
+            );
+          }
+        }
+      }
+
+      // ---- Real generated PDFs: evidence + PDFBox field verification -------
+      if (documentChecksEnabled) {
+        if (legacyDoc.pdfBytes) {
+          await reporter.artifact(
+            "PDF",
+            legacyDoc.pdfFileName ?? "gwt-generated.pdf",
+            "application/pdf",
+            legacyDoc.pdfBytes,
+          );
+        }
+        if (reactDoc.pdfBytes) {
+          await reporter.artifact(
+            "PDF",
+            reactDoc.pdfFileName ?? "react-generated.pdf",
+            "application/pdf",
+            reactDoc.pdfBytes,
+          );
+        }
+
+        if (legacyDoc.pdfBytes && !reactDoc.pdfBytes) {
+          findings.push(
+            finding(
+              "PDF_FIELD_MISSING",
+              "HIGH",
+              "React uygulaması PDF üretmedi",
+              {
+                legacyRef: "pdf",
+                legacyLabel: "PDF Çıktısı",
+                reactRef: null,
+                reactLabel: null,
+                confidence: 1,
+              },
+              "value",
+              "GWT 'PDF' işlemi sonucunda indirilebilir bir PDF dosyası üretti.",
+              "React 'PDF' işlemi dosya üretmedi (indirme veya gömülü PDF bulunamadı).",
+            ),
+          );
+        } else if (!legacyDoc.pdfBytes && reactDoc.pdfBytes) {
+          findings.push(
+            finding(
+              "PDF_FIELD_MISSING",
+              "HIGH",
+              "GWT uygulaması PDF üretmedi",
+              {
+                legacyRef: "pdf",
+                legacyLabel: "PDF Çıktısı",
+                reactRef: "pdf",
+                reactLabel: "PDF Çıktısı",
+                confidence: 1,
+              },
+              "value",
+              "React 'PDF' işlemi indirilebilir bir PDF dosyası üretti.",
+              "GWT 'PDF' işlemi dosya üretmedi (indirme veya gömülü PDF bulunamadı).",
+            ),
+          );
+        } else if (legacyDoc.pdfBytes && reactDoc.pdfBytes) {
+          const expectedFields = {
+            ...reactDoc.formFields,
+            ...legacyDoc.formFields,
+          };
+          if (Object.keys(expectedFields).length > 0) {
+            await reporter.event(
+              "STEP",
+              `Generated PDFs captured; verifying ${Object.keys(expectedFields).length} filled field(s) with PDFBox.`,
+            );
+            const pdfResult = await reporter.pdfCheck({
+              screenCode: job.screenCode,
+              gwtFileName: legacyDoc.pdfFileName ?? "gwt-generated.pdf",
+              gwtPdfBase64: Buffer.from(legacyDoc.pdfBytes).toString("base64"),
+              reactFileName: reactDoc.pdfFileName ?? "react-generated.pdf",
+              reactPdfBase64: Buffer.from(reactDoc.pdfBytes).toString("base64"),
+              expectedFields,
+            });
+            for (const difference of pdfResult?.differences ?? []) {
+              const isMissing =
+                difference.kind === "MISSING_FIELD" ||
+                difference.kind === "MISSING_IN_REFERENCE";
+              const pair =
+                mapping.find((candidate) => candidate.legacyLabel === difference.field) ?? {
                   legacyRef: "pdf",
-                  legacyLabel: fieldName,
+                  legacyLabel: difference.field,
                   reactRef: null,
                   reactLabel: null,
                   confidence: 1,
                 };
               findings.push(
                 finding(
-                  "FIELD_MISSING",
+                  isMissing && difference.kind === "MISSING_FIELD"
+                    ? "PDF_FIELD_MISSING"
+                    : "VALUE_MISMATCH",
                   "HIGH",
-                  `Oluşturulan PDF çıktısında eksik alan: ${fieldName}`,
-                  matchedPair,
+                  isMissing
+                    ? `PDF çıktısında eksik alan: ${difference.field}`
+                    : `PDF çıktısında hatalı değer: ${difference.field}`,
+                  pair,
                   "value",
-                  `GWT PDF çıktısında '${fieldName}: ${gwtPdfVal || "—"}' alanı yer alıyor.`,
-                  `React PDF çıktısında '${fieldName}' alanı hiç oluşturulmadı (PDF şablonunda eksik).`,
+                  `PDFBox beklentisi: '${difference.field}' alanı '${difference.expected ?? "—"}' değeriyle yer almalı.`,
+                  difference.kind === "PAGE_COUNT"
+                    ? `Sayfa sayısı farkı (GWT ${difference.expected}, React ${difference.actual}).`
+                    : `PDF'te bulunan: '${difference.actual ?? "(yok)"}' (${difference.kind}${
+                        difference.page ? `, sayfa ${difference.page}` : ""
+                      }).`,
                 ),
               );
             }
+            if (pdfResult && pdfResult.differences.length === 0) {
+              await reporter.event(
+                "STEP",
+                "PDFBox: both PDFs contain every filled form field with the same value.",
+              );
+            }
+          } else {
+            await reporter.event(
+              "INFO",
+              "Generated PDFs captured, but no filled form field was found to verify against the PDF content.",
+            );
           }
         }
+      }
 
-        if (
-          legacyDoc.signWorkflowStatus &&
-          reactDoc.signWorkflowStatus &&
-          legacyDoc.signWorkflowStatus !== reactDoc.signWorkflowStatus
-        ) {
-          findings.push({
-            category: "STATE_MISMATCH",
-            severity: "HIGH",
-            title: "İmzaya Gönder / Yayınla iş akışı durumu farkı",
-            legacyRef: "workflow-sign",
-            legacyLabel: "İmzaya Gönder Akışı",
-            reactRef: "workflow-sign",
-            reactLabel: "İmzaya Gönder Akışı",
-            attribute: "value",
-            expectedBehavior: `GWT İmzaya Gönder durumu: ${legacyDoc.signWorkflowStatus}`,
-            actualBehavior: `React İmzaya Gönder durumu: ${reactDoc.signWorkflowStatus}`,
-          });
+      // ---- Send to Sign / Publish workflow comparison (explicit opt-in) ----
+      if (workflowChecksEnabled) {
+        const workflowComparisons = [
+          {
+            key: "sign",
+            label: "İmzaya Gönder",
+            expected: legacyDoc.signWorkflowStatus,
+            actual: reactDoc.signWorkflowStatus,
+          },
+          {
+            key: "publish",
+            label: "Yayınla",
+            expected: legacyDoc.publishWorkflowStatus,
+            actual: reactDoc.publishWorkflowStatus,
+          },
+        ];
+        for (const workflow of workflowComparisons) {
+          if (workflow.expected && workflow.actual && workflow.expected !== workflow.actual) {
+            findings.push({
+              category: "WORKFLOW_MISMATCH",
+              severity: "HIGH",
+              title: `${workflow.label} iş akışı durumu farkı`,
+              legacyRef: `workflow-${workflow.key}`,
+              legacyLabel: `${workflow.label} Akışı`,
+              reactRef: `workflow-${workflow.key}`,
+              reactLabel: `${workflow.label} Akışı`,
+              attribute: "value",
+              expectedBehavior: `GWT ${workflow.label} durumu: ${workflow.expected}`,
+              actualBehavior: `React ${workflow.label} durumu: ${workflow.actual}`,
+            });
+          }
         }
+      }
 
       if (findings.length > 0) {
         await reporter.findings(findings.map((item) => ({ ...item })));
@@ -513,6 +740,29 @@ function buildAutoComparisonSteps(
   }
 
   return steps;
+}
+
+/**
+ * True when a click step targets a "İmzaya Gönder" / "Yayınla" style control.
+ * Used to keep mutating business workflows behind explicit opt-in.
+ */
+function isWorkflowTriggerStep(
+  step: PlanStep,
+  elements: DiscoveredElementRecord[],
+): boolean {
+  if (step.action !== "click" || !step.target) {
+    return false;
+  }
+  const element = elements.find((candidate) => candidate.ref === step.target);
+  const haystack = [
+    element?.label ?? "",
+    element?.accessibleName ?? "",
+    element?.name ?? "",
+    step.target,
+  ]
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
+  return /(imzaya gönder|yayınla|yayinla|send to sign|publish|\bsign\b)/.test(haystack);
 }
 
 function finding(

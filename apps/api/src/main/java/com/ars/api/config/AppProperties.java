@@ -77,7 +77,6 @@ public record AppProperties(
             Integer maxOutputTokens) {
         public boolean enabled() {
             return baseUrl != null && !baseUrl.isBlank()
-                    && apiKey != null && !apiKey.isBlank()
                     && model != null && !model.isBlank();
         }
     }

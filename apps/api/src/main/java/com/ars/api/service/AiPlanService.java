@@ -68,7 +68,8 @@ public class AiPlanService {
     public TestScenario proposePlan(Long projectId, Long screenId, String command, String actor) {
         if (!aiClient.enabled()) {
             throw ApiException.conflict("AI_NOT_CONFIGURED",
-                    "The AI provider is not configured. Set AI_BASE_URL, AI_MODEL and AI_API_KEY "
+                    "The AI provider is not configured. Set AI_BASE_URL and AI_MODEL "
+                            + "(AI_API_KEY is optional for company-hosted local LLMs) "
                             + "to enable AI-assisted planning.");
         }
 
