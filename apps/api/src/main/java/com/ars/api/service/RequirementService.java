@@ -98,15 +98,97 @@ public class RequirementService {
                     "The Confluence page contains no recognizable requirement entries.");
         }
 
+        return saveEntriesAndAnalyze(projectId, screenCode, confluencePageId, sourceUrl, entries);
+    }
+
+    /**
+     * Flexible Confluence sync from the Studio UI: accepts either an explicit
+     * Confluence Base URL + Page ID (+ optional Bearer Token) OR pasted/fetched
+     * Confluence change-log / requirement lines, imports new items and immediately
+     * compares them against discovered GWT/React screen elements.
+     */
+    public Map<String, Object> checkConfluenceDevelopments(
+            Long projectId,
+            String screenCode,
+            String confluenceBaseUrl,
+            String confluencePageId,
+            String confluenceToken,
+            String rawContent) {
+        String effectiveBaseUrl = (confluenceBaseUrl != null && !confluenceBaseUrl.isBlank())
+                ? confluenceBaseUrl.strip().replaceAll("/+$", "")
+                : (properties.confluence().enabled() ? properties.confluence().baseUrl() : null);
+        String effectiveToken = (confluenceToken != null && !confluenceToken.isBlank())
+                ? confluenceToken.strip()
+                : properties.confluence().token();
+
+        String bodyText = rawContent != null ? rawContent.strip() : "";
+        String pageKey = (confluencePageId != null && !confluencePageId.isBlank())
+                ? confluencePageId.strip()
+                : "CONFLUENCE-SYNC";
+        String sourceUrl = effectiveBaseUrl != null
+                ? "%s/pages/%s".formatted(effectiveBaseUrl, pageKey)
+                : "confluence://local/" + pageKey;
+
+        if (bodyText.isEmpty() && effectiveBaseUrl != null && confluencePageId != null && !confluencePageId.isBlank()) {
+            try {
+                var reqBuilder = java.net.http.HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(
+                                "%s/rest/api/content/%s?expand=body.storage,title,version".formatted(
+                                        effectiveBaseUrl, confluencePageId.strip())))
+                        .timeout(java.time.Duration.ofSeconds(15))
+                        .GET();
+                if (effectiveToken != null && !effectiveToken.isBlank()) {
+                    reqBuilder.header("Authorization", "Bearer " + effectiveToken);
+                }
+                String response = java.net.http.HttpClient.newHttpClient()
+                        .send(reqBuilder.build(), java.net.http.HttpResponse.BodyHandlers.ofString())
+                        .body();
+                JsonNode root = objectMapper.readTree(response);
+                String storage = root.path("body").path("storage").path("value").asText("");
+                bodyText = stripMarkup(storage);
+            } catch (Exception exception) {
+                log.warn("Confluence live fetch failed: {}", exception.getMessage());
+                throw ApiException.internalError("CONFLUENCE_UNREACHABLE",
+                        "Confluence sayfası çekilemedi: %s".formatted(exception.getMessage()));
+            }
+        }
+
+        if (bodyText.isEmpty()) {
+            throw ApiException.badRequest("CONFLUENCE_INPUT_REQUIRED",
+                    "Confluence sayfa bilgisi veya yeni geliştirme maddeleri girilmelidir.");
+        }
+
+        List<String> entries = splitRequirements(bodyText);
+        int imported = saveEntriesAndAnalyze(projectId, screenCode, pageKey, sourceUrl, entries);
+        int analyzed = analyzeCoverage(projectId, screenCode);
+        List<RequirementDefinition> all = list(projectId, screenCode);
+        long verifiedCount = all.stream().filter(r -> "VERIFIED".equals(r.getStatus())).count();
+        long missingCount = all.size() - verifiedCount;
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("imported", imported);
+        result.put("analyzed", analyzed);
+        result.put("totalRequirements", all.size());
+        result.put("verifiedCount", verifiedCount);
+        result.put("missingOrReviewCount", missingCount);
+        return result;
+    }
+
+    private int saveEntriesAndAnalyze(
+            Long projectId,
+            String screenCode,
+            String pageKey,
+            String sourceUrl,
+            List<String> entries) {
         int imported = 0;
         for (String entry : entries) {
-            if (repository.existsByProjectIdAndScreenCodeAndConfluenceId(
-                    projectId, screenCode, confluencePageId + "#" + hashOf(entry))) {
+            String cid = pageKey + "#" + hashOf(entry);
+            if (repository.existsByProjectIdAndScreenCodeAndConfluenceId(projectId, screenCode, cid)) {
                 continue;
             }
             RequirementDefinition requirement = new RequirementDefinition(projectId, screenCode,
                     clip(entry, 300));
-            requirement.setConfluenceId(confluencePageId + "#" + hashOf(entry));
+            requirement.setConfluenceId(cid);
             requirement.setContent(entry);
             requirement.setSourceUrl(sourceUrl);
             requirement.setTitle(clip(entry, 300));

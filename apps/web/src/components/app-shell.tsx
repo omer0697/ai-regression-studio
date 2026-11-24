@@ -38,6 +38,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: "Genel",
     items: [
+      { href: "/studio", label: "Ekran Test Stüdyosu", icon: <IconLayers /> },
       { href: "/", label: "Panel", icon: <IconHome /> },
       { href: "/projects", label: "Projeler", icon: <IconFolder /> },
       { href: "/executions", label: "Çalıştırmalar", icon: <IconPlay /> },

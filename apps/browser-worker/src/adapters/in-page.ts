@@ -1,11 +1,17 @@
-import type { Page } from "playwright";
+import type { Frame, Page } from "playwright";
 
 import type { DiscoveredElementRecord } from "@ars/shared-contracts";
 
 /**
+ * Separator used when an element lives inside a nested <iframe>.
+ * Format: "<iframeCssSelector> >>> <elementCssSelector>"
+ */
+export const FRAME_LOCATOR_SEPARATOR = " >>> ";
+
+/**
  * In-page discovery script. This function is serialized and evaluated inside
- * the page (untrusted DOM). It must be fully self-contained: no imports and
- * no closure variables.
+ * each frame (main document + any nested iframes). It must be fully
+ * self-contained: no imports and no closure variables.
  *
  * IMPORTANT: page content is treated as data only. Any instructions found in
  * DOM text are never interpreted as commands.
@@ -231,6 +237,11 @@ function inPageDiscover(strategy: "gwt" | "react"): Array<Record<string, unknown
   }
 
   for (const el of elements) {
+    // Skip elements tagged as shell navigation chrome when an iframe screen is hosted
+    if (el.closest("[data-ars-shell-ignore='true']")) {
+      continue;
+    }
+
     const type = el.tagName === "TABLE" ? "table" : classify(el);
     const visible = isVisible(el);
     const enabled =
@@ -247,8 +258,6 @@ function inPageDiscover(strategy: "gwt" | "react"): Array<Record<string, unknown
       const table = el as HTMLTableElement;
       const rows = table.rows ? table.rows.length : 0;
       const headerCells = table.tHead ? table.tHead.rows[0]?.cells.length ?? 0 : 0;
-      // Content digest lets the comparison engine detect data differences;
-      // header cells become the matching signature for table pairing.
       const digest: string[] = [];
       for (let i = 0; i < table.rows.length && digest.length < 40; i++) {
         const cells = Array.from(table.rows[i].cells)
@@ -307,27 +316,155 @@ function inPageDiscover(strategy: "gwt" | "react"): Array<Record<string, unknown
 }
 
 /**
- * Runs discovery inside the page and normalizes the records
- * (assigns stable refs e1..eN in DOM order).
+ * Resolves a stable CSS selector for an <iframe> element in its parent document
+ * so Playwright's `page.frameLocator(frameSelector)` can target it reliably.
+ */
+async function resolveFrameSelector(frame: Frame, frameIndex: number): Promise<string> {
+  try {
+    const frameElement = await frame.frameElement();
+    const selector = await frameElement.evaluate((el: Element) => {
+      if (el.id) return `iframe#${el.id}`;
+      const name = el.getAttribute("name");
+      if (name) return `iframe[name="${name}"]`;
+      const dataTestId = el.getAttribute("data-testid");
+      if (dataTestId) return `iframe[data-testid="${dataTestId}"]`;
+      const parent = el.parentElement;
+      if (parent) {
+        const iframes = Array.from(parent.querySelectorAll("iframe"));
+        const idx = iframes.indexOf(el as HTMLIFrameElement);
+        if (idx >= 0) return `iframe:nth-of-type(${idx + 1})`;
+      }
+      return "";
+    });
+    if (selector) return selector;
+  } catch {
+    // Fallback to nth iframe when frameElement is cross-origin or detached
+  }
+  return `iframe >> nth=${Math.max(0, frameIndex - 1)}`;
+}
+
+/**
+ * Runs discovery across the main page AND all accessible nested `<iframe>`
+ * frames, normalizing records with stable refs e1..eN and prefixing iframe
+ * locators with `<frameSelector> >>> <elementSelector>`.
  */
 export async function runDiscoveryInPage(
   page: Page,
   strategy: "gwt" | "react",
 ): Promise<DiscoveredElementRecord[]> {
-  const raw = await page.evaluate(`(${inPageDiscover.toString()})(${JSON.stringify(strategy)})`);
-  return (raw as Array<Record<string, unknown>>).map((record, index) => ({
-    ref: `e${index + 1}`,
-    label: (record.label as string | null) ?? null,
-    elementType: String(record.elementType ?? "other"),
-    accessibleName: (record.accessibleName as string | null) ?? null,
-    value: (record.value as string | null) ?? null,
-    enabled: Boolean(record.enabled),
-    visible: Boolean(record.visible),
-    required: (record.required as boolean | null) ?? null,
-    options: (record.options as string[] | null) ?? null,
-    locatorCandidates: (record.locatorCandidates as string[] | null) ?? null,
-    name: (record.name as string | null) ?? null,
-    domPath: (record.domPath as string | null) ?? null,
-    confidence: Number(record.confidence ?? 0),
-  }));
+  const script = `(${inPageDiscover.toString()})(${JSON.stringify(strategy)})`;
+  const allRaw: Array<{ record: Record<string, unknown>; frameSelector: string | null }> = [];
+
+  // 1) Always scan the main frame (keeps unit tests with mock Page working too).
+  const mainRaw = (await page.evaluate(script)) as Array<Record<string, unknown>>;
+  for (const record of mainRaw) {
+    allRaw.push({ record, frameSelector: null });
+  }
+
+  // 2) Scan child iframes if the page exposes Playwright's `page.frames()`.
+  if (typeof page.frames === "function") {
+    const frames = page.frames();
+    const mainFrame = typeof page.mainFrame === "function" ? page.mainFrame() : frames[0];
+    let childIndex = 0;
+    for (const frame of frames) {
+      if (frame === mainFrame) continue;
+      childIndex += 1;
+      try {
+        await frame.waitForLoadState("domcontentloaded", { timeout: 3_000 }).catch(() => undefined);
+        const frameSelector = await resolveFrameSelector(frame, childIndex);
+        const frameRaw = (await frame.evaluate(script)) as Array<Record<string, unknown>>;
+        for (const record of frameRaw) {
+          allRaw.push({ record, frameSelector });
+        }
+      } catch {
+        // Unreachable or cross-origin frame that blocks script evaluation — skip gracefully
+      }
+    }
+  }
+
+  return allRaw.map(({ record, frameSelector }, index) => {
+    const rawCandidates = (record.locatorCandidates as string[] | null) ?? null;
+    const locatorCandidates =
+      rawCandidates && frameSelector
+        ? rawCandidates.map((candidate) => `${frameSelector}${FRAME_LOCATOR_SEPARATOR}${candidate}`)
+        : rawCandidates;
+    const rawDomPath = (record.domPath as string | null) ?? null;
+    const domPath =
+      frameSelector && rawDomPath
+        ? `[iframe: ${frameSelector}] ${rawDomPath}`
+        : frameSelector
+          ? `[iframe: ${frameSelector}]`
+          : rawDomPath;
+
+    return {
+      ref: `e${index + 1}`,
+      label: (record.label as string | null) ?? null,
+      elementType: String(record.elementType ?? "other"),
+      accessibleName: (record.accessibleName as string | null) ?? null,
+      value: (record.value as string | null) ?? null,
+      enabled: Boolean(record.enabled),
+      visible: Boolean(record.visible),
+      required: (record.required as boolean | null) ?? null,
+      options: (record.options as string[] | null) ?? null,
+      locatorCandidates,
+      name: (record.name as string | null) ?? null,
+      domPath,
+      confidence: Number(record.confidence ?? 0),
+    };
+  });
+}
+
+/**
+ * Executes an action against either a top-level selector or a nested iframe
+ * selector formatted as `<frameSelector> >>> <elementSelector>`.
+ */
+export async function performPageOrFrameAction(
+  page: Page,
+  compositeSelector: string,
+  action:
+    | { kind: "click" }
+    | { kind: "fill"; value: string }
+    | { kind: "selectOption"; value: string }
+    | { kind: "check" }
+    | { kind: "uncheck" },
+): Promise<void> {
+  if (compositeSelector.includes(FRAME_LOCATOR_SEPARATOR) && typeof page.frameLocator === "function") {
+    const [frameSel, elSel] = compositeSelector.split(FRAME_LOCATOR_SEPARATOR, 2);
+    const locator = page.frameLocator(frameSel.trim()).locator(elSel.trim()).first();
+    switch (action.kind) {
+      case "click":
+        await locator.click();
+        return;
+      case "fill":
+        await locator.fill(action.value);
+        return;
+      case "selectOption":
+        await locator.selectOption(action.value);
+        return;
+      case "check":
+        await locator.check();
+        return;
+      case "uncheck":
+        await locator.uncheck();
+        return;
+    }
+  }
+
+  switch (action.kind) {
+    case "click":
+      await page.click(compositeSelector);
+      return;
+    case "fill":
+      await page.fill(compositeSelector, action.value);
+      return;
+    case "selectOption":
+      await page.selectOption(compositeSelector, action.value);
+      return;
+    case "check":
+      await page.check(compositeSelector);
+      return;
+    case "uncheck":
+      await page.uncheck(compositeSelector);
+      return;
+  }
 }

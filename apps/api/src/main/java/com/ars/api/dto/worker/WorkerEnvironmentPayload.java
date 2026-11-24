@@ -34,11 +34,17 @@ public record WorkerEnvironmentPayload(
 
     public static WorkerEnvironmentPayload from(
             com.ars.api.domain.entity.ApplicationEnvironment env) {
+        return from(env, null);
+    }
+
+    public static WorkerEnvironmentPayload from(
+            com.ars.api.domain.entity.ApplicationEnvironment env,
+            String screenRoute) {
         return new WorkerEnvironmentPayload(
                 env.getProjectId(),
                 env.getAppType(),
                 env.getDisplayName(),
-                env.getBaseUrl(),
+                resolveTargetUrl(env.getBaseUrl(), screenRoute),
                 env.getEnvironmentLabel(),
                 env.getAuthMethod(),
                 env.getCredentialReference(),
@@ -53,5 +59,30 @@ public record WorkerEnvironmentPayload(
                 env.getExplorationMaxInteractions(),
                 env.getExplorationMaxOptions(),
                 env.isScreenshotEnabled());
+    }
+
+    /**
+     * Combines the environment's base URL with the screen's route/path when provided.
+     */
+    public static String resolveTargetUrl(String baseUrl, String screenRoute) {
+        if (screenRoute == null || screenRoute.isBlank()) {
+            return baseUrl;
+        }
+        String route = screenRoute.trim();
+        if (route.startsWith("http://") || route.startsWith("https://")) {
+            return route;
+        }
+        String cleanBase = baseUrl == null ? "" : baseUrl.trim();
+        if (cleanBase.endsWith(route)) {
+            return cleanBase;
+        }
+        if (route.startsWith("#") || route.startsWith("?")) {
+            return cleanBase + route;
+        }
+        String baseWithoutTrailingSlash = cleanBase.replaceAll("/+$", "");
+        if (route.startsWith("/")) {
+            return baseWithoutTrailingSlash + route;
+        }
+        return baseWithoutTrailingSlash + "/" + route;
     }
 }

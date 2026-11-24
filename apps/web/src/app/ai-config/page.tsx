@@ -165,7 +165,7 @@ function SettingsForm({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="ai-api-key">API anahtarı</Label>
+            <Label htmlFor="ai-api-key">API anahtarı (Şirket içi Local LLM için isteğe bağlı)</Label>
             <Input
               id="ai-api-key"
               type="password"
@@ -173,15 +173,15 @@ function SettingsForm({
               placeholder={
                 initial.apiKeyPresent
                   ? "Kayıtlı — değiştirmek istemiyorsanız boş bırakın"
-                  : "Anahtarı buraya girin"
+                  : "Anahtarsız Local LLM ise boş bırakabilirsiniz"
               }
               value={apiKey}
               disabled={!isAdmin}
               onChange={(event) => setApiKey(event.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Yalnızca yazılır; hiçbir yanıtta geri döndürülmez. Boş bırakırsanız
-              kayıtlı anahtar korunur.
+              Şirket içi Local LLM (vLLM, Ollama, TGI, LM Studio vb.) anahtar
+              gerektirmiyorsa boş bırakabilirsiniz; sistem otomatik bağlanır.
             </p>
           </div>
 

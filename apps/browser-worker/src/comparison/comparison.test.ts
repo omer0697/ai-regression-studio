@@ -167,4 +167,36 @@ describe("ComparisonRunner — differential engine against injected defects", ()
       .find((event) => event.message.startsWith("Comparison finished"));
     expect(summary?.message).toContain("behavioral difference(s) detected");
   }, 240_000);
+
+  it("auto-explores and compares GWT vs React screens embedded inside nested <iframe> shells", async () => {
+    const runner = new ComparisonRunner(browser, loadCredentialStore(config));
+    const reporter = new RecordingReporter();
+
+    const baseJob = comparisonJob();
+    const iframeJob: ComparisonJob = {
+      ...baseJob,
+      plan: {
+        scenarioName: "Auto-explore iframe comparison",
+        screen: "KPY68",
+        steps: [{ action: "wait", value: "auto-explore" }],
+      },
+      legacyApp: {
+        ...baseJob.legacyApp,
+        baseUrl: `${pathToFileURL(join(fixturesDir, "gwt-iframe-shell.html")).toString()}#KPY68`,
+      },
+      reactApp: {
+        ...baseJob.reactApp,
+        baseUrl: `${pathToFileURL(join(fixturesDir, "react-iframe-shell.html")).toString()}#/kpy68`,
+      },
+    };
+
+    await runner.run(iframeJob, reporter as unknown as ExecutionReporter);
+
+    expect(reporter.statuses.at(-1)?.status).toBe("COMPLETED");
+    const findings = reporter.findingBatches.at(0) ?? [];
+    const labels = findings.map((f) => `${f.category}|${f.legacyLabel}`).join("\n");
+    expect(labels).toContain("FIELD_MISSING|Açıklama");
+    expect(labels).toContain("DEPENDENCY_MISMATCH|Parametre Değeri");
+    expect(labels).toContain("VALUE_MISMATCH|Parametre Kodu");
+  }, 240_000);
 });

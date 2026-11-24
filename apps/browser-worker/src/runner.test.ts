@@ -227,4 +227,28 @@ describe("DiscoverJobRunner — real Chromium end to end", () => {
     expect(messages).not.toContain("submit");
     expect(messages).not.toContain("Sorgula");
   }, 120_000);
+
+  it("discovers and interacts with GWT screens hosted inside a nested <iframe> shell", async () => {
+    const credentials = loadCredentialStore(config);
+    const runner = new DiscoverJobRunner(browser, credentials);
+    const reporter = new RecordingReporter();
+
+    const iframeJob = jobFor({
+      baseUrl: `${pathToFileURL(join(fixturesDir, "gwt-iframe-shell.html")).toString()}#KPY68`,
+    });
+
+    await runner.run(iframeJob, reporter as unknown as ExecutionReporter);
+
+    expect(reporter.statuses.at(-1)?.status).toBe("COMPLETED");
+    const discovered = reporter.elementBatches.at(0) ?? [];
+    expect(discovered.length).toBe(15);
+    // Every discovered element inside the iframe carries the [iframe: ...] marker
+    expect(
+      discovered.every((el) => String(el.domPath ?? "").startsWith("[iframe: iframe#gwtScreenFrame]")),
+    ).toBe(true);
+    // Interactive dependency exploration inside the nested iframe also succeeds and reverts cleanly
+    const observations = reporter.observationBatches.at(0) ?? [];
+    expect(observations.length).toBe(4);
+    expect(observations.every((obs) => obs.reverted === true)).toBe(true);
+  }, 120_000);
 });

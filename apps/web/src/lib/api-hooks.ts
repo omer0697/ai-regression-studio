@@ -307,3 +307,62 @@ export function useProposeAiPlan() {
     },
   });
 }
+
+export function useBrowserSessions() {
+  return useQuery({
+    queryKey: ["worker", "sessions"] as const,
+    queryFn: () => api.listBrowserSessions(),
+    refetchInterval: 2500,
+  });
+}
+
+export function useOpenManualLoginWindow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { profileKey?: string; targetUrl: string }) =>
+      api.openManualLoginWindow(body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["worker", "sessions"] });
+    },
+  });
+}
+
+export function useSaveManualLoginSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { profileKey: string; closeWindow?: boolean }) =>
+      api.saveManualLoginSession(body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["worker", "sessions"] });
+    },
+  });
+}
+
+export function useContinueManualLoginExecution() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      executionId,
+      skipNavigation,
+    }: {
+      executionId: number;
+      skipNavigation?: boolean;
+    }) => api.continueManualLoginExecution(executionId, { skipNavigation }),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ["worker", "sessions"] });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.execution(variables.executionId),
+      });
+    },
+  });
+}
+
+export function useDeleteBrowserSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (profileKey: string) => api.deleteBrowserSession(profileKey),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["worker", "sessions"] });
+    },
+  });
+}

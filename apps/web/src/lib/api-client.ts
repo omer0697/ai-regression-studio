@@ -25,6 +25,48 @@ export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/backend").rep
   "",
 );
 
+export const WORKER_BASE = (process.env.NEXT_PUBLIC_WORKER_BASE_URL ?? "/worker").replace(
+  /\/$/,
+  "",
+);
+
+async function workerRequest<T>(
+  path: string,
+  options: { method?: "GET" | "POST" | "DELETE"; body?: unknown } = {},
+): Promise<T> {
+  const method = options.method ?? "GET";
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (options.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+  const response = await fetch(`${WORKER_BASE}${path}`, {
+    method,
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+  if (response.status === 204) {
+    return undefined as T;
+  }
+  const text = await response.text();
+  let parsed: Record<string, unknown> = {};
+  if (text) {
+    try {
+      parsed = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      // ignore non-json
+    }
+  }
+  if (!response.ok) {
+    const errObj = (parsed.error ?? {}) as { code?: string; message?: string };
+    throw new ApiError(
+      response.status,
+      errObj.code ?? `WORKER_HTTP_${response.status}`,
+      errObj.message ?? `Worker isteği başarısız oldu (HTTP ${response.status}).`,
+    );
+  }
+  return parsed as T;
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
@@ -293,6 +335,39 @@ export const api = {
       `/projects/${projectId}/screens/${screenCode}/requirements/analyze`,
       { method: "POST" },
     ),
+  checkConfluenceDevelopments: (
+    projectId: number,
+    screenCode: string,
+    body: {
+      confluenceBaseUrl?: string;
+      confluencePageId?: string;
+      confluenceToken?: string;
+      rawContent?: string;
+    },
+  ) =>
+    request<{
+      imported: number;
+      analyzed: number;
+      totalRequirements: number;
+      verifiedCount: number;
+      missingOrReviewCount: number;
+    }>(
+      `/projects/${projectId}/screens/${screenCode}/requirements/check-confluence`,
+      { method: "POST", body },
+    ),
+  getMarkdownReport: async (executionId: number): Promise<string> => {
+    const response = await fetch(`${API_BASE}/executions/${executionId}/report.md`, {
+      credentials: "include",
+    });
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        `HTTP_${response.status}`,
+        "Markdown hata raporu alınamadı.",
+      );
+    }
+    return response.text();
+  },
   sendChat: (projectId: number, message: string) =>
     request<ChatReply>(`/projects/${projectId}/chat`, {
       method: "POST",
@@ -300,7 +375,59 @@ export const api = {
     }),
   listChat: (projectId: number) =>
     request<ChatReply[]>(`/projects/${projectId}/chat`),
+
+  // ---- Browser Worker Interactive Sessions & Manual Login ----
+  listBrowserSessions: () =>
+    workerRequest<BrowserSessionsResponse>("/api/sessions"),
+  openManualLoginWindow: (body: { profileKey?: string; targetUrl: string }) =>
+    workerRequest<SavedBrowserSession>("/api/sessions/open", {
+      method: "POST",
+      body,
+    }),
+  saveManualLoginSession: (body: { profileKey: string; closeWindow?: boolean }) =>
+    workerRequest<SavedBrowserSession>("/api/sessions/save", {
+      method: "POST",
+      body,
+    }),
+  continueManualLoginExecution: (
+    executionId: number,
+    body?: { skipNavigation?: boolean },
+  ) =>
+    workerRequest<{ resumed: boolean; executionId: number }>(
+      `/api/sessions/executions/${executionId}/continue`,
+      {
+        method: "POST",
+        body: body ?? {},
+      },
+    ),
+  deleteBrowserSession: (profileKey: string) =>
+    workerRequest<void>(`/api/sessions/${encodeURIComponent(profileKey)}`, {
+      method: "DELETE",
+    }),
 };
+
+export interface SavedBrowserSession {
+  profileKey: string;
+  targetUrl: string;
+  currentUrl: string;
+  cookieCount: number;
+  originCount: number;
+  savedAt: string;
+  windowOpen: boolean;
+}
+
+export interface PendingManualLoginExecution {
+  executionId: number;
+  appType: string;
+  loginUrl: string;
+  targetUrl: string;
+  startedAt: string;
+}
+
+export interface BrowserSessionsResponse {
+  sessions: SavedBrowserSession[];
+  pendingExecutions: PendingManualLoginExecution[];
+}
 
 export interface RequirementInfo {
   id: number;

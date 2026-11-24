@@ -24,6 +24,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  useBrowserSessions,
+  useContinueManualLoginExecution,
   useExecution,
   useExecutionArtifacts,
   useExecutionElements,
@@ -79,6 +81,8 @@ export default function ExecutionDetailPage() {
   const { data: elements } = useExecutionElements(executionId);
   const { data: observations } = useExecutionObservations(executionId);
   const { data: findings } = useExecutionFindings(executionId);
+  const { data: sessionData } = useBrowserSessions();
+  const continueManualLogin = useContinueManualLoginExecution();
   const stream = useExecutionStream(Number.isFinite(executionId) ? executionId : null);
 
   const startExecution = useStartExecution(execution?.projectId ?? 0);
@@ -86,6 +90,11 @@ export default function ExecutionDetailPage() {
   // Prefer the fresher stream status while it is connected.
   const status = stream.connected && stream.status ? stream.status : execution?.status;
   const reportBase = `${API_BASE}/executions/${executionId}`;
+
+  const isWaitingForManualLogin =
+    Boolean(sessionData?.pendingExecutions.some((p) => p.executionId === executionId)) ||
+    (stream.events.some((ev) => ev.message.includes("MANUAL_LOGIN_WAITING")) &&
+      !stream.events.some((ev) => ev.message.includes("Manuel giriş onaylandı")));
 
   const workerExplanation = explainWorkerError(execution?.errorCode ?? null);
 
@@ -163,6 +172,48 @@ export default function ExecutionDetailPage() {
             <StatCard label="Kalan" value={execution.failedSteps} />
             <StatCard label="Atlanan" value={execution.skippedSteps} />
           </div>
+
+          {isWaitingForManualLogin ? (
+            <Card className="border-2 border-warning bg-warning/10">
+              <CardHeader className="flex-row items-start gap-3 space-y-0">
+                <IconAlert className="mt-0.5 text-warning" width={20} height={20} />
+                <div>
+                  <CardTitle>Tarayıcı Penceresi Açıldı — Manuel Giriş Bekleniyor</CardTitle>
+                  <CardDescription className="mt-1 text-foreground/90">
+                    Açılan görünür Chromium penceresinde giriş işlemini elinizle tamamlayın.
+                    Ardından aşağıdaki butonla testi devam ettirin.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-3">
+                <Button
+                  onClick={() =>
+                    void continueManualLogin.mutateAsync({
+                      executionId,
+                      skipNavigation: false,
+                    })
+                  }
+                  disabled={continueManualLogin.isPending}
+                >
+                  <IconCheck />
+                  Giriş Yaptım → Verilen Ekran Path&apos;ine Git ve Testi Başlat
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    void continueManualLogin.mutateAsync({
+                      executionId,
+                      skipNavigation: true,
+                    })
+                  }
+                  disabled={continueManualLogin.isPending}
+                >
+                  <IconPlay />
+                  Giriş Yaptım ve Ekranı Kendim Açtım → Olduğum Ekranda Test Et
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {workerExplanation ? (
             <Card className="border-warning/40">
@@ -372,37 +423,48 @@ export default function ExecutionDetailPage() {
                         <TableHead>Etiket</TableHead>
                         <TableHead>Tip</TableHead>
                         <TableHead>Değer</TableHead>
+                        <TableHead>Konum (DOM / Iframe)</TableHead>
                         <TableHead>Durum</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {elements.map((element) => (
-                        <TableRow key={element.ref}>
-                          <TableCell className="font-mono text-xs text-muted-foreground">
-                            {element.ref}
-                          </TableCell>
-                          <TableCell className="max-w-48 truncate">
-                            {element.label ?? "—"}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {element.elementType}
-                          </TableCell>
-                          <TableCell className="max-w-48 truncate text-muted-foreground">
-                            {element.value ?? "—"}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              <Badge tone={element.enabled ? "success" : "muted"}>
-                                {element.enabled ? "etkin" : "pasif"}
-                              </Badge>
-                              <Badge tone={element.visible ? "info" : "warning"}>
-                                {element.visible ? "görünür" : "gizli"}
-                              </Badge>
-                              {element.required ? <Badge tone="danger">zorunlu</Badge> : null}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {elements.map((element) => {
+                        const iframeMatch = element.domPath?.match(/^\[iframe:\s*([^\]]+)\]/);
+                        return (
+                          <TableRow key={element.ref}>
+                            <TableCell className="font-mono text-xs text-muted-foreground">
+                              {element.ref}
+                            </TableCell>
+                            <TableCell className="max-w-48 truncate">
+                              {element.label ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {element.elementType}
+                            </TableCell>
+                            <TableCell className="max-w-48 truncate text-muted-foreground">
+                              {element.value ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {iframeMatch ? (
+                                <Badge tone="info">{iframeMatch[1]}</Badge>
+                              ) : (
+                                <span className="text-muted-foreground">Ana Sayfa</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                <Badge tone={element.enabled ? "success" : "muted"}>
+                                  {element.enabled ? "etkin" : "pasif"}
+                                </Badge>
+                                <Badge tone={element.visible ? "info" : "warning"}>
+                                  {element.visible ? "görünür" : "gizli"}
+                                </Badge>
+                                {element.required ? <Badge tone="danger">zorunlu</Badge> : null}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

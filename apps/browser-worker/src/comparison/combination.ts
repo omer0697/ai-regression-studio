@@ -4,8 +4,10 @@ import type { CombinationJob, MappingPair } from "@ars/test-schemas";
 import type { DiscoveredElementRecord } from "@ars/shared-contracts";
 
 import { adapterFor } from "../adapters/index.js";
+import { performPageOrFrameAction } from "../adapters/in-page.js";
 import type { BrowserLifecycle } from "../browser/lifecycle.js";
 import { performFormLogin } from "../browser/login.js";
+import type { SessionManager } from "../browser/session-manager.js";
 import type { CredentialStore } from "../credentials.js";
 import type { ExecutionReporter } from "../reporter.js";
 import { buildLabelMapping } from "./mapping.js";
@@ -33,6 +35,7 @@ export class CombinationRunner {
   constructor(
     private readonly browser: BrowserLifecycle,
     private readonly credentials: CredentialStore,
+    private readonly sessions?: SessionManager,
   ) {}
 
   async run(job: CombinationJob, reporter: ExecutionReporter): Promise<void> {
@@ -42,22 +45,49 @@ export class CombinationRunner {
 
     try {
       await reporter.status({ status: "RUNNING" });
-      const browser = await this.browser.acquire();
 
       // ---- Discover both apps once (combination candidates come from GWT) --
-      legacyContext = await browser.newContext({ viewport: { width: 1366, height: 900 } });
+      const gwtManual = this.sessions?.isManualInteractive(job.legacyApp) ?? false;
+      const gwtSaved = await this.sessions?.resolveStorageState(job.legacyApp);
+      const gwtBrowser = gwtManual
+        ? await this.browser.acquireVisible()
+        : await this.browser.acquire();
+      legacyContext = await gwtBrowser.newContext({
+        viewport: { width: 1366, height: 900 },
+        ...(gwtSaved ? { storageState: gwtSaved.storageState } : {}),
+      });
       const legacyPage = await legacyContext.newPage();
       const legacyElements = await this.openApp(
-        legacyPage, job.legacyApp, job, reporter, timeoutMs);
+        legacyPage,
+        legacyContext,
+        job.legacyApp,
+        job,
+        reporter,
+        timeoutMs,
+      );
       await reporter.event(
         "STEP",
         `Combination mode: GWT screen ready (${legacyElements.length} elements).`,
       );
 
-      reactContext = await browser.newContext({ viewport: { width: 1366, height: 900 } });
+      const reactManual = this.sessions?.isManualInteractive(job.reactApp) ?? false;
+      const reactSaved = await this.sessions?.resolveStorageState(job.reactApp);
+      const reactBrowser = reactManual
+        ? await this.browser.acquireVisible()
+        : await this.browser.acquire();
+      reactContext = await reactBrowser.newContext({
+        viewport: { width: 1366, height: 900 },
+        ...(reactSaved ? { storageState: reactSaved.storageState } : {}),
+      });
       const reactPage = await reactContext.newPage();
       const reactElements = await this.openApp(
-        reactPage, job.reactApp, job, reporter, timeoutMs);
+        reactPage,
+        reactContext,
+        job.reactApp,
+        job,
+        reporter,
+        timeoutMs,
+      );
       await reporter.event(
         "STEP",
         `Combination mode: React screen ready (${reactElements.length} elements).`,
@@ -198,18 +228,24 @@ export class CombinationRunner {
       }
       try {
         if (assignment.elementType === "select") {
-          await page.selectOption(selector, assignment.value);
+          await performPageOrFrameAction(page, selector, {
+            kind: "selectOption",
+            value: assignment.value,
+          });
         } else if (assignment.elementType === "checkbox") {
           if (assignment.value === "true") {
-            await page.check(selector);
+            await performPageOrFrameAction(page, selector, { kind: "check" });
           } else {
-            await page.uncheck(selector);
+            await performPageOrFrameAction(page, selector, { kind: "uncheck" });
           }
         } else if (assignment.elementType === "radio") {
-          await page.check(selector);
+          await performPageOrFrameAction(page, selector, { kind: "check" });
         } else if (assignment.elementType === "text"
             || assignment.elementType === "textarea") {
-          await page.fill(selector, assignment.value);
+          await performPageOrFrameAction(page, selector, {
+            kind: "fill",
+            value: assignment.value,
+          });
         }
       } catch {
         // A field that cannot take this value in this app is itself a
@@ -224,13 +260,27 @@ export class CombinationRunner {
 
   private async openApp(
     page: Page,
+    context: BrowserContext,
     environment: CombinationJob["legacyApp"],
     job: CombinationJob,
     reporter: ExecutionReporter,
     timeoutMs: number,
   ): Promise<DiscoveredElementRecord[]> {
     const adapter = adapterFor(environment.appType);
-    if (environment.authMethod === "TEST_ACCOUNT_FORM") {
+    const isManualInteractive = this.sessions?.isManualInteractive(environment) ?? false;
+
+    let skipNavigation = false;
+    if (isManualInteractive && this.sessions) {
+      const manualOutcome = await this.sessions.performInteractiveExecutionLogin(
+        job.executionId,
+        page,
+        context,
+        environment,
+        reporter,
+        timeoutMs,
+      );
+      skipNavigation = manualOutcome.skipNavigation;
+    } else if (environment.authMethod === "TEST_ACCOUNT_FORM") {
       await performFormLogin(
         page,
         environment,
@@ -239,10 +289,12 @@ export class CombinationRunner {
         timeoutMs,
       );
     }
-    await page.goto(environment.baseUrl, {
-      waitUntil: "domcontentloaded",
-      timeout: timeoutMs,
-    });
+    if (!skipNavigation || page.url() === "about:blank") {
+      await page.goto(environment.baseUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: timeoutMs,
+      });
+    }
     await adapter.waitForReady(page, timeoutMs);
     return adapter.discoverElements(page);
   }

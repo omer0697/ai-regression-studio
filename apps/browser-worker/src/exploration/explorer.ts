@@ -2,6 +2,7 @@ import type { Page } from "playwright";
 
 import type { DiscoveredElementRecord } from "@ars/shared-contracts";
 
+import { performPageOrFrameAction } from "../adapters/in-page.js";
 import type { ExecutionReporter } from "../reporter.js";
 
 export interface ExplorationBudget {
@@ -196,15 +197,18 @@ export class DependencyExplorer {
       }
 
       if (step.kind === "selectOption" && step.value) {
-        await this.page.selectOption(selector, step.value);
+        await performPageOrFrameAction(this.page, selector, {
+          kind: "selectOption",
+          value: step.value,
+        });
       } else if (step.kind === "setCheckbox") {
         if (step.value === "true") {
-          await this.page.check(selector);
+          await performPageOrFrameAction(this.page, selector, { kind: "check" });
         } else {
-          await this.page.uncheck(selector);
+          await performPageOrFrameAction(this.page, selector, { kind: "uncheck" });
         }
       } else if (step.kind === "chooseRadio") {
-        await this.page.check(selector);
+        await performPageOrFrameAction(this.page, selector, { kind: "check" });
       } else {
         return { observations: [], error: "unsupported interaction" };
       }
@@ -293,16 +297,19 @@ export class DependencyExplorer {
         const original = baseline.get(step.source.ref)?.value ?? step.source.value;
         const selector = step.source.locatorCandidates?.[0];
         if (selector && original) {
-          await this.page.selectOption(selector, original);
+          await performPageOrFrameAction(this.page, selector, {
+            kind: "selectOption",
+            value: original,
+          });
         }
       } else if (step.kind === "setCheckbox") {
         const selector = step.source.locatorCandidates?.[0];
         const originalChecked = baseline.get(step.source.ref)?.value === "true";
         if (selector) {
           if (originalChecked) {
-            await this.page.check(selector);
+            await performPageOrFrameAction(this.page, selector, { kind: "check" });
           } else {
-            await this.page.uncheck(selector);
+            await performPageOrFrameAction(this.page, selector, { kind: "uncheck" });
           }
         }
       } else if (step.kind === "chooseRadio") {
@@ -315,7 +322,7 @@ export class DependencyExplorer {
         );
         const selector = originalRadio?.locatorCandidates?.[0];
         if (selector) {
-          await this.page.check(selector);
+          await performPageOrFrameAction(this.page, selector, { kind: "check" });
         }
       }
       await this.stabilize();

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <title>KAP Kurumsal Portal (GWT Iframe Shell)</title>
+  <style>
+    body { margin: 0; font-family: Tahoma, Arial, sans-serif; font-size: 12px; background: #dfe8f6; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    .portal-header { background: #1e3a63; color: #fff; padding: 6px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #9cb3d5; }
+    .portal-body { display: flex; flex: 1; min-height: 0; }
+    .portal-sidebar { width: 200px; background: #eef3fb; border-right: 1px solid #9cb3d5; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+    .menu-item { padding: 6px 8px; border-radius: 3px; background: #d4e2f7; color: #1e3a63; font-weight: bold; border: 1px solid #9cb3d5; }
+    .portal-content { flex: 1; display: flex; flex-direction: column; background: #fff; }
+    .iframe-toolbar { background: #f3f6fb; border-bottom: 1px solid #c9d7ec; padding: 4px 10px; font-size: 11px; color: #4a607a; display: flex; justify-content: space-between; }
+    iframe { flex: 1; width: 100%; border: none; background: #fff; }
+  </style>
+</head>
+<body>
+  <div class="portal-header" data-ars-shell-ignore="true">
+    <div><strong>KAP GWT Portal</strong> — Kurumsal Uygulama Kabuğu (Iframe Modu)</div>
+    <div id="activeRouteBadge">Aktif Ekran: KPY68</div>
+  </div>
+  <div class="portal-body">
+    <div class="portal-sidebar" data-ars-shell-ignore="true">
+      <div style="font-size:11px;color:#555;margin-bottom:4px;">MODÜL MENÜSÜ</div>
+      <div class="menu-item">▶ KPY68 — Parametre Tanımları</div>
+    </div>
+    <div class="portal-content">
+      <div class="iframe-toolbar" data-ars-shell-ignore="true">
+        <span>Gömülü Ekran Container: <code>iframe#gwtScreenFrame</code></span>
+        <span id="frameSrcLabel">src: gwt-kpy68.html</span>
+      </div>
+      <iframe id="gwtScreenFrame" name="gwtScreenFrame" src="gwt-kpy68.html" title="GWT KPY68 Screen"></iframe>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var hash = window.location.hash.replace(/^#\/?/, "");
+      var params = new URLSearchParams(window.location.search);
+      var screen = params.get("screen") || hash || "KPY68";
+      document.getElementById("activeRouteBadge").textContent = "Aktif Ekran: " + screen.toUpperCase();
+    })();
+  </script>
+</body>
+</html>

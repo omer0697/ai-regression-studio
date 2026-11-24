@@ -115,8 +115,8 @@ public class ExecutionService {
                     screen.getName(),
                     ExecutionMode.COMPARISON,
                     planMap,
-                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(legacyEnvironment),
-                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(reactEnvironment),
+                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(legacyEnvironment, screen.getLegacyRoute()),
+                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(reactEnvironment, screen.getReactRoute()),
                     java.util.List.of());
             outcome = workerClient.dispatchComparison(comparisonPayload);
         } else if (mode == ExecutionMode.COMBINATION) {
@@ -132,8 +132,8 @@ public class ExecutionService {
                     screen.getName(),
                     ExecutionMode.COMBINATION,
                     budget,
-                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(legacyEnvironment),
-                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(reactEnvironment));
+                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(legacyEnvironment, screen.getLegacyRoute()),
+                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(reactEnvironment, screen.getReactRoute()));
             outcome = workerClient.dispatchComparison(combinationPayload);
         } else {
             var payload = new com.ars.api.dto.worker.WorkerDiscoverJobPayload(
@@ -143,9 +143,9 @@ public class ExecutionService {
                     screen.getScreenCode(),
                     screen.getName(),
                     mode,
-                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(legacyEnvironment),
+                    com.ars.api.dto.worker.WorkerEnvironmentPayload.from(legacyEnvironment, screen.getLegacyRoute()),
                     reactEnvironment == null ? null
-                            : com.ars.api.dto.worker.WorkerEnvironmentPayload.from(reactEnvironment));
+                            : com.ars.api.dto.worker.WorkerEnvironmentPayload.from(reactEnvironment, screen.getReactRoute()));
             outcome = workerClient.dispatchDiscover(payload);
         }
 
@@ -232,9 +232,18 @@ public class ExecutionService {
             }
         }
 
-        throw ApiException.conflict("NO_PLAN_DATA",
-                "Comparison needs an approved scenario or a prior discovery run with "
-                        + "dependency observations for this screen.");
+        var autoSteps = java.util.List.of(
+                java.util.Map.<String, Object>of("action", "wait", "value", "auto-explore"));
+        var autoPlan = new java.util.LinkedHashMap<String, Object>();
+        autoPlan.put("scenarioName", "Auto-discovery comparison plan for %s".formatted(screen.getScreenCode()));
+        autoPlan.put("screen", screen.getScreenCode());
+        autoPlan.put("description",
+                "Automatically discovers interactive controls on GWT and compares behavior against React.");
+        autoPlan.put("steps", autoSteps);
+        events.append(executionId,
+                com.ars.api.domain.enums.ExecutionEventType.INFO,
+                "No prior scenario found; worker will auto-discover GWT interactions and compare against React.");
+        return new ComparisonPlan(autoPlan, "AUTO_DISCOVER");
     }
 
     private String interactionToAction(String interaction) {

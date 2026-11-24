@@ -3,6 +3,7 @@ import type { DiscoverJob } from "@ars/test-schemas";
 import { adapterFor } from "./adapters/index.js";
 import type { BrowserLifecycle } from "./browser/lifecycle.js";
 import { performFormLogin } from "./browser/login.js";
+import type { SessionManager } from "./browser/session-manager.js";
 import type { CredentialStore } from "./credentials.js";
 import { DependencyExplorer } from "./exploration/explorer.js";
 import type { ExecutionReporter } from "./reporter.js";
@@ -16,15 +17,16 @@ interface SessionDiagnostics {
 
 /**
  * Runs a discover job end to end:
- * launch isolated context -> (optional) secure form login -> navigate ->
- * wait ready -> passive discovery -> screenshot/trace/console evidence ->
- * honest terminal status. No interactive business action is ever performed
- * during discovery.
+ * launch isolated context (with optional saved session or manual interactive
+ * login window) -> navigate to screen URL/path -> wait ready (including nested
+ * iframes) -> passive discovery -> safe interactive exploration ->
+ * screenshot/trace/console evidence -> honest terminal status.
  */
 export class DiscoverJobRunner {
   constructor(
     private readonly browser: BrowserLifecycle,
     private readonly credentials: CredentialStore,
+    private readonly sessions?: SessionManager,
   ) {}
 
   async run(job: DiscoverJob, reporter: ExecutionReporter): Promise<void> {
@@ -36,43 +38,77 @@ export class DiscoverJobRunner {
       failedRequests: [],
     };
     const timeoutMs = environment.browserTimeoutMs;
+    const isManualInteractive = this.sessions?.isManualInteractive(environment) ?? false;
 
     let context = null;
     try {
       await reporter.status({ status: "RUNNING" });
-      await reporter.event("INFO", "Launching an isolated Chromium context.");
 
-      const browser = await this.browser.acquire();
-      context = await browser.newContext({ viewport: { width: 1366, height: 900 } });
+      const savedSession = await this.sessions?.resolveStorageState(environment);
+      const browser = isManualInteractive
+        ? await this.browser.acquireVisible()
+        : await this.browser.acquire();
+
+      await reporter.event(
+        "INFO",
+        isManualInteractive
+          ? "Görünür (interaktif) Chromium oturumu başlatılıyor (Manuel Login modu)."
+          : savedSession
+            ? `Chromium oturumu kayıtlı oturum ('${savedSession.profileKey}') ile başlatılıyor.`
+            : "İzole Chromium oturumu başlatılıyor.",
+      );
+
+      context = await browser.newContext({
+        viewport: { width: 1366, height: 900 },
+        ...(savedSession ? { storageState: savedSession.storageState } : {}),
+      });
       await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
 
       const page = await context.newPage();
       this.collectDiagnostics(context, page, diagnostics);
 
-      if (environment.authMethod === "TEST_ACCOUNT_FORM") {
+      let skipNavigation = false;
+      if (isManualInteractive && this.sessions) {
+        const manualOutcome = await this.sessions.performInteractiveExecutionLogin(
+          job.executionId,
+          page,
+          context,
+          environment,
+          reporter,
+          timeoutMs,
+        );
+        skipNavigation = manualOutcome.skipNavigation;
+      } else if (environment.authMethod === "TEST_ACCOUNT_FORM") {
         await this.login(page, environment, reporter, timeoutMs);
       }
 
       const targetUrl = environment.baseUrl;
-      await reporter.event("INFO", `Navigating to ${targetUrl}`);
-      await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+      if (!skipNavigation || page.url() === "about:blank") {
+        await reporter.event("INFO", `Navigating to ${targetUrl}`);
+        await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+      } else {
+        await reporter.event("INFO", `Mevcut açık ekran kullanılıyor: ${page.url()}`);
+      }
 
       await adapter.waitForReady(page, timeoutMs);
       await reporter.event("STEP", "Application is ready.");
 
       const elements = await adapter.discoverElements(page);
+      const iframeCount = elements.filter((el) => el.domPath?.startsWith("[iframe:")).length;
       await reporter.event(
         "STEP",
-        `Discovered ${elements.length} elements on ${job.screenCode}.`,
+        `Discovered ${elements.length} elements on ${job.screenCode}${
+          iframeCount > 0 ? ` (${iframeCount} inside nested iframe)` : ""
+        }.`,
         {
           total: elements.length,
+          iframeElements: iframeCount,
           byType: countByType(elements.map((element) => element.elementType)),
           hidden: elements.filter((element) => !element.visible).length,
           disabled: elements.filter((element) => !element.enabled).length,
         },
       );
 
-      // Passive discovery only — prohibited business actions are never executed.
       await reporter.elements(
         elements.map((element) => ({ ...element, appType: environment.appType })),
       );
@@ -167,8 +203,7 @@ export class DiscoverJobRunner {
       await reporter.status({
         status: "COMPLETED",
         totalSteps: elements.length + executedInteractions + failedInteractions,
-        passedSteps:
-            elements.length - hiddenCount + executedInteractions,
+        passedSteps: elements.length - hiddenCount + executedInteractions,
         skippedSteps: hiddenCount,
         failedSteps: failedInteractions,
       });
@@ -192,10 +227,6 @@ export class DiscoverJobRunner {
     }
   }
 
-  /**
-   * Secure test login: credentials come from the local store by reference and
-   * are used only inside the isolated browser context — never logged.
-   */
   private async login(
     page: import("playwright").Page,
     environment: DiscoverJob["legacyApp"],

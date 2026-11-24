@@ -10,11 +10,14 @@
     table.gwt-FormLayout td { padding: 4px 8px; vertical-align: middle; }
     td.gwt-FormLabel { width: 180px; color: #333; }
     .gwt-TextBox { border: 1px solid #7f9db9; padding: 2px; }
-    .gwt-Button { padding: 3px 10px; }
+    .gwt-Button { padding: 3px 10px; cursor: pointer; }
     table.gwt-DataTable { border-collapse: collapse; margin: 12px; }
     table.gwt-DataTable th { background: #dfe8f6; border: 1px solid #9cb3d5; padding: 4px; text-align: left; }
     table.gwt-DataTable td { border: 1px solid #c9d7ec; padding: 4px; }
-    .gwt-Label { color: #333; }
+    .gwt-Label { color: #333; margin: 8px 12px; font-weight: bold; }
+    .workflow-bar { margin: 12px; padding: 8px 12px; background: #f3f7fd; border: 1px solid #9cb3d5; display: flex; gap: 8px; align-items: center; }
+    .workflow-trigger { padding: 4px 10px; background: #1e3a63; color: #fff; border-radius: 3px; cursor: pointer; font-size: 11px; user-select: none; }
+    .pdf-preview-box { margin: 12px; padding: 10px 14px; border: 1px dashed #2d4d7f; background: #fafcff; font-size: 11px; }
   </style>
 </head>
 <body>
@@ -76,6 +79,18 @@
     </tr>
   </table>
 
+  <div class="workflow-bar" data-ars-shell-ignore="true">
+    <strong>Belge &amp; Onay Akışı:</strong>
+    <span class="workflow-trigger" id="btnSendToSign" data-ars-workflow="SEND_TO_SIGN">İmzaya Gönder</span>
+    <span class="workflow-trigger" id="btnPublish" data-ars-workflow="PUBLISH">Yayınla</span>
+    <span id="workflowStatusText" data-ars-workflow-status="HAZIR">Durum: HAZIR</span>
+  </div>
+
+  <div class="pdf-preview-box" id="generatedPdfPreview" data-ars-pdf-output="true">
+    <strong>Oluşturulan PDF Belge İçeriği (GWT):</strong>
+    <div id="pdfFieldsContainer">Henüz PDF oluşturulmadı.</div>
+  </div>
+
   <div class="gwt-Label" id="resultHeader">Sorgu Sonuçları (2 kayıt)</div>
   <table class="gwt-DataTable">
     <thead>
@@ -88,11 +103,6 @@
   </table>
 
   <script>
-    // Fixture dependency behaviors (the behavior under exploration):
-    //  1. select DIGER -> Parametre Değeri becomes enabled and auto-populates;
-    //     any other option -> disabled and cleared (fully revert-safe).
-    //  2. unchecking Aktif -> Başlangıç Tarihi becomes disabled.
-    //  3. choosing Manuel -> conditional "Onay Notu" section becomes visible.
     var paramType = document.querySelector("select[name='paramType']");
     var paramValue = document.querySelector("input[name='paramValue']");
     function applyTypeDependency() {
@@ -121,6 +131,47 @@
         approvalRow.style.display = radio.value === "MANUEL" ? "" : "none";
       });
     });
+
+    function buildPdfContent() {
+      var code = document.querySelector("input[name='paramCode']").value || "";
+      var type = paramType.value || "";
+      var val = paramValue.value || "";
+      var desc = document.querySelector("textarea[name='description']").value || "";
+      var date = startDate.value || "";
+      var isAct = active.checked ? "true" : "false";
+      var checkedRadio = document.querySelector("input[name='approvalType']:checked");
+      var appType = checkedRadio ? checkedRadio.value : "";
+
+      var fields = {
+        "Parametre Kodu": code,
+        "Parametre Tipi": type,
+        "Parametre Değeri": val,
+        "Açıklama": desc,
+        "Başlangıç Tarihi": date,
+        "Aktif": isAct,
+        "Onay Tipi": appType
+      };
+      var container = document.getElementById("pdfFieldsContainer");
+      container.setAttribute("data-pdf-json", JSON.stringify(fields));
+      container.textContent = Object.keys(fields)
+        .map(function (k) { return k + ": " + fields[k]; })
+        .join(" | ");
+    }
+
+    document.getElementById("btnPdf").addEventListener("click", buildPdfContent);
+    document.getElementById("btnSendToSign").addEventListener("click", function () {
+      buildPdfContent();
+      var st = document.getElementById("workflowStatusText");
+      st.setAttribute("data-ars-workflow-status", "IMZAYA_GONDERILDI");
+      st.textContent = "Durum: IMZAYA_GONDERILDI (e-İmza Kuyruğunda)";
+    });
+    document.getElementById("btnPublish").addEventListener("click", function () {
+      buildPdfContent();
+      var st = document.getElementById("workflowStatusText");
+      st.setAttribute("data-ars-workflow-status", "YAYINLANDI");
+      st.textContent = "Durum: YAYINLANDI (KAP Bildirimi Yayında)";
+    });
+    buildPdfContent();
   </script>
 </body>
 </html>

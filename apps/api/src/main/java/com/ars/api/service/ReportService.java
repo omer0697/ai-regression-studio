@@ -11,15 +11,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ars.api.domain.entity.BugFinding;
 import com.ars.api.domain.entity.DiscoveredElement;
+import com.ars.api.domain.entity.RequirementDefinition;
 import com.ars.api.domain.repository.BugFindingRepository;
 import com.ars.api.domain.repository.DiscoveredElementRepository;
+import com.ars.api.domain.repository.RequirementDefinitionRepository;
 import com.ars.api.domain.repository.TestExecutionRepository;
 import com.ars.api.dto.ExecutionView;
 
 /**
  * Aggregated execution reports: summary, category breakdown, findings,
- * discovered coverage and honest unverified sections. Exportable as JSON and
- * as a PDFBox-generated PDF report.
+ * discovered coverage and honest unverified sections. Exportable as JSON,
+ * Markdown (.md) bug explanation document, and a PDFBox-generated PDF report.
  */
 @Service
 public class ReportService {
@@ -27,16 +29,19 @@ public class ReportService {
     private final TestExecutionRepository executionRepository;
     private final BugFindingRepository bugRepository;
     private final DiscoveredElementRepository elementRepository;
+    private final RequirementDefinitionRepository requirementRepository;
     private final PdfComparisonService pdfService;
 
     public ReportService(
             TestExecutionRepository executionRepository,
             BugFindingRepository bugRepository,
             DiscoveredElementRepository elementRepository,
+            RequirementDefinitionRepository requirementRepository,
             PdfComparisonService pdfService) {
         this.executionRepository = executionRepository;
         this.bugRepository = bugRepository;
         this.elementRepository = elementRepository;
+        this.requirementRepository = requirementRepository;
         this.pdfService = pdfService;
     }
 
@@ -103,6 +108,128 @@ public class ReportService {
         report.put("findings", findingList);
 
         return report;
+    }
+
+    /**
+     * Generates a developer-ready Markdown (.md) report explaining every detected
+     * GWT <-> React regression, missing PDF field, workflow (Send to Sign / Publish)
+     * discrepancy, and Confluence requirement coverage. Also writes a copy to
+     * data/reports/BUG-REPORT-<screenCode>-exec-<id>.md.
+     */
+    public String buildMarkdownReport(Long executionId) {
+        ExecutionView execution = executionRepository.findByIdWithNames(executionId)
+                .orElseThrow(() -> new com.ars.api.web.ApiException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "EXECUTION_NOT_FOUND",
+                        "Execution %d does not exist.".formatted(executionId)));
+
+        List<BugFinding> findings = bugRepository.findByExecutionIdOrderByIdAsc(executionId);
+        List<DiscoveredElement> elements = elementRepository
+                .findByExecutionIdOrderByElementRefAsc(executionId);
+        List<RequirementDefinition> requirements = requirementRepository
+                .findByProjectIdAndScreenCodeOrderByIdAsc(execution.projectId(), execution.screenCode());
+
+        StringBuilder md = new StringBuilder();
+        md.append("# GWT ↔ React Dönüşüm Test & Hata Açıklama Raporu (").append(execution.screenCode()).append(")\n\n");
+        md.append("- **Çalıştırma No:** `#").append(execution.id()).append("`\n");
+        md.append("- **Proje:** ").append(execution.projectName()).append("\n");
+        md.append("- **Ekran:** `").append(execution.screenCode()).append("` — ").append(execution.screenName()).append("\n");
+        md.append("- **Test Modu:** `").append(execution.mode().name()).append("`\n");
+        md.append("- **Durum:** `").append(execution.status().name()).append("`\n");
+        md.append("- **Rapor Tarihi:** ").append(Instant.now().toString()).append("\n\n");
+
+        md.append("## 1. Yürütme Özeti\n\n");
+        md.append("| Metrik | Değer |\n");
+        md.append("| --- | --- |\n");
+        md.append("| Keşfedilen Ekran / Iframe Elemanı | ").append(elements.size()).append(" |\n");
+        md.append("| Toplam Test Adımı | ").append(execution.totalSteps()).append(" |\n");
+        md.append("| Başarılı Adım | ").append(execution.passedSteps()).append(" |\n");
+        md.append("| Tespit Edilen Fark / Hata Sayısı | **").append(findings.size()).append("** |\n\n");
+
+        md.append("## 2. Tespit Edilen Hatalar ve Detaylı Açıklamaları\n\n");
+        if (findings.isEmpty()) {
+            md.append("> Bu çalıştırmada GWT ile React ekranları arasında davranışsal fark tespit edilmedi.\n\n");
+        } else {
+            for (BugFinding finding : findings) {
+                md.append("### ").append(finding.getBugCode()).append(" — ").append(finding.getTitle()).append("\n\n");
+                md.append("- **Önem Derecesi:** `").append(finding.getSeverity()).append("`\n");
+                md.append("- **Kategori:** `").append(finding.getCategory()).append("`\n");
+                md.append("- **Eski (GWT) Beklenen Davranış:** ").append(finding.getExpectedBehavior() == null ? "—" : finding.getExpectedBehavior()).append("\n");
+                md.append("- **Yeni (React) Gerçekleşen Davranış:** ").append(finding.getActualBehavior() == null ? "—" : finding.getActualBehavior()).append("\n");
+                md.append("- **Hata Açıklaması & Çözüm Önerisi:** ").append(explainFindingInTurkish(finding)).append("\n");
+                if (finding.getAiHypothesis() != null && !finding.getAiHypothesis().isBlank()) {
+                    md.append("- **Local LLM (AI) Kök Neden Analizi:** ").append(finding.getAiHypothesis()).append("\n");
+                }
+                md.append("\n");
+            }
+        }
+
+        md.append("## 3. Confluence Yeni Geliştirme & Gereksinim Karşılaştırması\n\n");
+        if (requirements.isEmpty()) {
+            md.append("_Bu ekran için henüz Confluence yeni geliştirme veya gereksinim maddesi senkronize edilmedi._\n\n");
+        } else {
+            md.append("| Durum | Confluence / Gereksinim Maddesi | Eşleşen Ekran Elemanları |\n");
+            md.append("| --- | --- | --- |\n");
+            for (RequirementDefinition req : requirements) {
+                Object matched = req.getCoverage() != null ? req.getCoverage().get("matchedElements") : null;
+                String statusBadge = "VERIFIED".equals(req.getStatus())
+                        ? "DOĞRULANDI (Ekranda Mevcut)"
+                        : "EKSİK / İNCELEME GEREKLİ (Ekranda Bulunamadı)";
+                md.append("| **").append(statusBadge).append("** | ")
+                        .append(req.getTitle().replace("|", "\\|")).append(" | ")
+                        .append(matched != null ? matched.toString() : "Eşleşme yok").append(" |\n");
+            }
+            md.append("\n");
+        }
+
+        md.append("## 4. Keşfedilen Ekran ve Iframe Elemanları\n\n");
+        md.append("| Ref | Etiket | Tip | Değer | Etkin | Görünür | Konum |\n");
+        md.append("| --- | --- | --- | --- | --- | --- | --- |\n");
+        for (DiscoveredElement el : elements) {
+            String loc = (el.getDomPath() != null && el.getDomPath().startsWith("[iframe:"))
+                    ? el.getDomPath().substring(0, el.getDomPath().indexOf(']') + 1)
+                    : "Ana DOM";
+            md.append("| `").append(el.getElementRef()).append("` | ")
+                    .append(el.getLabel() == null ? "—" : el.getLabel().replace("|", "\\|")).append(" | ")
+                    .append(el.getElementType()).append(" | ")
+                    .append(el.getCurrentValue() == null ? "—" : el.getCurrentValue().replace("|", "\\|")).append(" | ")
+                    .append(el.isEnabled() ? "Evet" : "Hayır").append(" | ")
+                    .append(el.isVisible() ? "Evet" : "Hayır").append(" | ")
+                    .append(loc).append(" |\n");
+        }
+
+        String markdownText = md.toString();
+        try {
+            java.nio.file.Path reportsDir = java.nio.file.Paths.get("data", "reports");
+            java.nio.file.Files.createDirectories(reportsDir);
+            java.nio.file.Path reportFile = reportsDir.resolve(
+                    "BUG-REPORT-%s-exec-%d.md".formatted(execution.screenCode(), execution.id()));
+            java.nio.file.Files.writeString(reportFile, markdownText, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+            // Non-fatal if filesystem write fails
+        }
+        return markdownText;
+    }
+
+    private String explainFindingInTurkish(BugFinding finding) {
+        String title = finding.getTitle() == null ? "" : finding.getTitle();
+        if (title.contains("PDF")) {
+            return "Formda doldurulan alan GWT tarafında üretilen PDF belgesine yansırken, React tarafındaki PDF şablonunda/servisinde eksik bırakılmıştır. React PDF üretim payload'una bu form alanı eklenmelidir.";
+        }
+        if (title.contains("İmzaya Gönder") || title.contains("Yayınla")) {
+            return "Belge iş akışı (İmzaya Gönder / Yayınla) GWT ekranında belgeyi e-İmza/yayın kuyruğuna geçirirken, React ekranında durum geçişi veya servis bağlantısı eksik/hatalı çalışmaktadır.";
+        }
+        return switch (finding.getCategory()) {
+            case "FIELD_MISSING" ->
+                "GWT ekranında bulunan (veya belirli bir seçim yapıldığında dinamik açılan) bu form alanı React dönüşümünde ekrana eklenmemiş ya da etiket/koşullu render kuralı unutulmuştur.";
+            case "DEPENDENCY_MISMATCH" ->
+                "GWT ekranında bir kontrol (select/checkbox/radio) değiştirildiğinde bağımlı alanı otomatik etkinleştirme/pasifleştirme veya değer doldurma kuralı çalışırken, React ekranında ilgili onChange / state bağımlılığı uygulanmamıştır.";
+            case "VALUE_MISMATCH" ->
+                "Ekran ilk açıldığında veya işlem sonrasında GWT'de gelen varsayılan/API değeri React form state'ine (initialValues / defaultValue) bağlanmamıştır.";
+            case "TABLE_MISMATCH" ->
+                "Veri tablosundaki satır/hücre değerleri veya kolon yapısı GWT ile React arasında farklılık göstermektedir.";
+            default ->
+                "Alan etkinlik (disabled) veya görünürlük (visible) durumu GWT referans ekranıyla uyuşmamaktadır.";
+        };
     }
 
     /** PDFBox-rendered Turkish report with summary + findings table. */

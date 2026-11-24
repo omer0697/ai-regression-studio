@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { IconChat, IconChevronRight } from "@/components/icons";
+import { IconChat, IconChevronRight, IconLayers, IconPlay } from "@/components/icons";
 import {
   Card,
   CardContent,
@@ -103,15 +103,50 @@ export default function DashboardPage() {
         title="Panel"
         description="Migration projelerinin regresyon test durumunu tek ekrandan takip edin."
         actions={
-          <Link
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-subtle bg-surface-2 px-4 text-sm font-medium hover:bg-surface-2/70"
-            href="/chat"
-          >
-            <IconChat />
-            Proje Sohbeti
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              href="/studio"
+            >
+              <IconPlay />
+              Ekran Test & Rapor Stüdyosu
+            </Link>
+            <Link
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-subtle bg-surface-2 px-4 text-sm font-medium hover:bg-surface-2/70"
+              href="/chat"
+            >
+              <IconChat />
+              Proje Sohbeti
+            </Link>
+          </div>
         }
       />
+
+      <Card className="border-primary/40 bg-primary/5">
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-4 space-y-0">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+              <IconLayers width={20} height={20} />
+            </span>
+            <div>
+              <CardTitle>Hızlı GWT ↔ React Ekran & Iframe Test Stüdyosu</CardTitle>
+              <CardDescription className="mt-1">
+                Uygulama URL&apos;sini ve test edilecek ekranın path&apos;ini verin, login
+                aşamasını ister elinizle görünür tarayıcıda geçin ister oturumu kaydedin,
+                iframe ekranlarını canlı izleyip karşılaştırma ve PDF/JSON raporunu tek
+                ekrandan çıkartın.
+              </CardDescription>
+            </div>
+          </div>
+          <Link
+            href="/studio"
+            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            <IconPlay />
+            Stüdyoyu Aç
+          </Link>
+        </CardHeader>
+      </Card>
 
       {isError ? (
         <EmptyState

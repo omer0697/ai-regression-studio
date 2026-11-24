@@ -84,24 +84,29 @@ public class AiSettingsService {
             String apiKey,
             Integer timeoutSeconds,
             Integer maxOutputTokens) {
-        AiProviderSetting row = repository.findById(AiProviderSetting.SINGLETON_ID)
-                .orElseGet(() -> new AiProviderSetting(baseUrl, model, apiKey));
-        row.setEnabled(enabled);
-        row.setBaseUrl(blankToNull(baseUrl));
-        row.setModel(blankToNull(model));
-        if (apiKey != null && !apiKey.isBlank()) {
-            row.setApiKey(apiKey.strip());
-        }
-        row.setTimeoutSeconds(timeoutSeconds == null || timeoutSeconds <= 0
+        AiProviderSetting existing = repository.findById(AiProviderSetting.SINGLETON_ID).orElse(null);
+        String resolvedKey = (apiKey != null && !apiKey.isBlank())
+                ? apiKey.strip()
+                : (existing != null && existing.getApiKey() != null && !existing.getApiKey().isBlank()
+                        ? existing.getApiKey()
+                        : "local-llm");
+        AiProviderSetting targetRow = existing != null
+                ? existing
+                : new AiProviderSetting(baseUrl, model, resolvedKey);
+        targetRow.setEnabled(enabled);
+        targetRow.setBaseUrl(blankToNull(baseUrl));
+        targetRow.setModel(blankToNull(model));
+        targetRow.setApiKey(resolvedKey);
+        targetRow.setTimeoutSeconds(timeoutSeconds == null || timeoutSeconds <= 0
                 ? DEFAULT_TIMEOUT_SECONDS : timeoutSeconds);
-        row.setMaxOutputTokens(maxOutputTokens == null || maxOutputTokens <= 0
+        targetRow.setMaxOutputTokens(maxOutputTokens == null || maxOutputTokens <= 0
                 ? DEFAULT_MAX_OUTPUT_TOKENS : maxOutputTokens);
 
-        if (enabled && !isConfigured(true, row.getBaseUrl(), row.getModel(), row.getApiKey())) {
+        if (enabled && !isConfigured(true, targetRow.getBaseUrl(), targetRow.getModel(), targetRow.getApiKey())) {
             throw ApiException.badRequest("AI_CONFIG_INCOMPLETE",
-                    "Enabling the AI provider requires a base URL, a model and an API key.");
+                    "Enabling the AI provider requires a base URL and a model name.");
         }
-        return repository.save(row);
+        return repository.save(targetRow);
     }
 
     /** Optional maintenance: drops the UI-managed row back to env-only. */

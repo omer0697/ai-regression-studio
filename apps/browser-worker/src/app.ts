@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 
 import { BrowserLifecycle } from "./browser/lifecycle.js";
+import { SessionManager } from "./browser/session-manager.js";
 import { loadConfig, type WorkerConfig } from "./config.js";
 import { loadCredentialStore, type CredentialStore } from "./credentials.js";
 import { ComparisonRunner } from "./comparison/comparison.js";
@@ -8,6 +9,7 @@ import { CombinationRunner } from "./comparison/combination.js";
 import { healthRoutes } from "./routes/health.js";
 import { fixtureRoutes } from "./routes/fixtures.js";
 import { createJobRoutes } from "./routes/jobs.js";
+import { createSessionRoutes } from "./routes/sessions.js";
 import { DiscoverJobRunner } from "./runner.js";
 
 export interface BuildAppOptions {
@@ -17,6 +19,7 @@ export interface BuildAppOptions {
   config?: WorkerConfig;
   browser?: BrowserLifecycle;
   credentials?: CredentialStore;
+  sessions?: SessionManager;
   runner?: DiscoverJobRunner;
   comparisonRunner?: ComparisonRunner;
   combinationRunner?: CombinationRunner;
@@ -26,11 +29,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const config = options.config ?? loadConfig();
   const browser = options.browser ?? new BrowserLifecycle(config);
   const credentials = options.credentials ?? loadCredentialStore(config);
-  const runner = options.runner ?? new DiscoverJobRunner(browser, credentials);
+  const sessions = options.sessions ?? new SessionManager(browser);
+  const runner = options.runner ?? new DiscoverJobRunner(browser, credentials, sessions);
   const comparisonRunner =
-      options.comparisonRunner ?? new ComparisonRunner(browser, credentials);
+      options.comparisonRunner ?? new ComparisonRunner(browser, credentials, sessions);
   const combinationRunner =
-      options.combinationRunner ?? new CombinationRunner(browser, credentials);
+      options.combinationRunner ?? new CombinationRunner(browser, credentials, sessions);
 
   const app = Fastify({
     logger: {
@@ -38,20 +42,22 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     },
   });
 
-  if (options.allowedOrigins && options.allowedOrigins.length > 0) {
-    app.addHook("onRequest", async (request, reply) => {
-      const origin = request.headers.origin;
-      if (origin && options.allowedOrigins?.includes(origin)) {
-        reply.header("access-control-allow-origin", origin);
-        reply.header("access-control-allow-credentials", "true");
-        reply.header("access-control-allow-headers", "content-type");
-        reply.header("access-control-allow-methods", "GET,POST,OPTIONS");
-        if (request.method === "OPTIONS") {
-          return reply.code(204).send();
-        }
+  app.addHook("onRequest", async (request, reply) => {
+    const origin = request.headers.origin;
+    const isAllowed =
+      origin &&
+      ((options.allowedOrigins && options.allowedOrigins.includes(origin)) ||
+        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin));
+    if (isAllowed) {
+      reply.header("access-control-allow-origin", origin);
+      reply.header("access-control-allow-credentials", "true");
+      reply.header("access-control-allow-headers", "content-type");
+      reply.header("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS");
+      if (request.method === "OPTIONS") {
+        return reply.code(204).send();
       }
-    });
-  }
+    }
+  });
 
   app.setErrorHandler((error, _request, reply) => {
     app.log.error(error);
@@ -67,6 +73,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   void app.register(healthRoutes);
   void app.register(fixtureRoutes);
+  void app.register(createSessionRoutes(sessions));
   void app.register(
     createJobRoutes(config, browser, credentials, runner, comparisonRunner, combinationRunner),
   );

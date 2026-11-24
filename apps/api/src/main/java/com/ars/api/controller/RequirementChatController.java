@@ -87,6 +87,31 @@ public class RequirementChatController {
         return Map.of("analyzed", analyzed);
     }
 
+    public record ConfluenceCheckBody(
+            @Size(max = 500)
+            String confluenceBaseUrl,
+            @Size(max = 120)
+            String confluencePageId,
+            @Size(max = 500)
+            String confluenceToken,
+            @Size(max = 10000)
+            String rawContent) {
+    }
+
+    @PostMapping("/projects/{projectId}/screens/{screenCode}/requirements/check-confluence")
+    public Map<String, Object> checkConfluenceDevelopments(
+            @PathVariable Long projectId,
+            @PathVariable String screenCode,
+            @Valid @RequestBody ConfluenceCheckBody body) {
+        return requirementService.checkConfluenceDevelopments(
+                projectId,
+                screenCode,
+                body.confluenceBaseUrl(),
+                body.confluencePageId(),
+                body.confluenceToken(),
+                body.rawContent());
+    }
+
     @GetMapping("/projects/{projectId}/screens/{screenCode}/requirements")
     public List<Map<String, Object>> list(
             @PathVariable Long projectId,

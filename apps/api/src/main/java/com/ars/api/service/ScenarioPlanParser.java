@@ -126,9 +126,11 @@ public class ScenarioPlanParser {
         return new ParsedPlan(scenarioName, screen, description, steps);
     }
 
-    /** Strips markdown code fences the model may add around the JSON. */
+    /** Strips <think> blocks, markdown code fences and surrounding prose around JSON. */
     static String extractJson(String raw) {
         String text = raw.trim();
+        // Strip <think>...</think> reasoning blocks emitted by local reasoning LLMs (e.g. DeepSeek-R1 / QwQ)
+        text = text.replaceAll("(?s)<think>.*?</think>", "").trim();
         if (text.startsWith("```")) {
             int firstBreak = text.indexOf('\n');
             if (firstBreak > 0) {
@@ -139,6 +141,11 @@ public class ScenarioPlanParser {
                 text = text.substring(0, closing);
             }
             text = text.trim();
+        }
+        int firstBrace = text.indexOf('{');
+        int lastBrace = text.lastIndexOf('}');
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+            text = text.substring(firstBrace, lastBrace + 1).trim();
         }
         return text;
     }

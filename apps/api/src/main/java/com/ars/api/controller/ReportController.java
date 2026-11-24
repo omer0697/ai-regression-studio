@@ -32,6 +32,16 @@ public class ReportController {
         return reportService.buildReport(id);
     }
 
+    @GetMapping(value = "/executions/{id}/report.md", produces = "text/markdown; charset=UTF-8")
+    public ResponseEntity<String> reportMarkdown(@PathVariable Long id) {
+        String md = reportService.buildMarkdownReport(id);
+        return ResponseEntity.status(HttpStatus.OK)
+                .header(HttpHeaders.CONTENT_TYPE, "text/markdown; charset=UTF-8")
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"ars-bug-report-%d.md\"".formatted(id))
+                .body(md);
+    }
+
     @GetMapping("/executions/{id}/report.pdf")
     public ResponseEntity<byte[]> reportPdf(@PathVariable Long id) {
         byte[] pdf = reportService.buildPdfReport(id);

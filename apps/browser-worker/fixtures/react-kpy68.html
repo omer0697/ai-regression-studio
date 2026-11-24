@@ -16,24 +16,12 @@
     .ant-table th { background: #fafafa; border-bottom: 1px solid #f0f0f0; padding: 10px; text-align: left; }
     .ant-table td { border-bottom: 1px solid #f0f0f0; padding: 10px; }
     .app-content { max-width: 688px; margin: 0 auto; }
+    .workflow-bar { max-width: 640px; margin: 12px auto; padding: 10px 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; display: flex; gap: 10px; align-items: center; font-size: 12px; }
+    .workflow-trigger { padding: 5px 12px; background: #2563eb; color: #fff; border-radius: 6px; cursor: pointer; user-select: none; }
+    .pdf-preview-box { max-width: 640px; margin: 12px auto; padding: 10px 14px; border: 1px dashed #94a3b8; background: #fff; border-radius: 8px; font-size: 12px; }
   </style>
 </head>
 <body>
-  <!--
-    INTENTIONALLY DEFECTIVE React fixture (master prompt §20).
-    Known regressions versus the GWT fixture:
-      1. FIELD_MISSING: the "Açıklama" textarea is missing entirely.
-      2. FIELD_MISSING: the conditional "Onay Notu" section never appears
-         (choosing Manuel does nothing).
-      3. DEPENDENCY_MISMATCH: "Parametre Değeri" stays disabled when DIGER is
-         selected (GWT enables and auto-populates it).
-      4. STATE_MISMATCH: "Başlangıç Tarihi" stays enabled when "Aktif" is
-         unchecked (GWT disables it).
-      5. VALUE_MISMATCH: "Parametre Kodu" is empty (GWT shows KPY-001 —
-         simulates an API-bound value not reaching the form).
-      6. TABLE_MISMATCH: the results table's second row shows XYZ-8 instead
-         of XYZ-9.
-  -->
   <div id="root">
     <header class="app-header">KAP — KPY68 Parametre Tanımları</header>
     <div class="app-content">
@@ -74,6 +62,18 @@
         </div>
       </form>
 
+      <div class="workflow-bar" data-ars-shell-ignore="true">
+        <strong>Belge &amp; Onay Akışı:</strong>
+        <span class="workflow-trigger" id="btnSendToSign" data-ars-workflow="SEND_TO_SIGN">İmzaya Gönder</span>
+        <span class="workflow-trigger" id="btnPublish" data-ars-workflow="PUBLISH">Yayınla</span>
+        <span id="workflowStatusText" data-ars-workflow-status="HAZIR">Durum: HAZIR</span>
+      </div>
+
+      <div class="pdf-preview-box" id="generatedPdfPreview" data-ars-pdf-output="true">
+        <strong>Oluşturulan PDF Belge İçeriği (React):</strong>
+        <div id="pdfFieldsContainer">Henüz PDF oluşturulmadı.</div>
+      </div>
+
       <table class="ant-table">
         <thead><tr><th>Kod</th><th>Tip</th><th>Değer</th><th>Durum</th></tr></thead>
         <tbody>
@@ -83,5 +83,40 @@
       </table>
     </div>
   </div>
+  <script>
+    // Intentionally defective PDF & Workflow implementation in React migration:
+    // 1. Generated PDF omits "Başlangıç Tarihi" and "Açıklama" fields.
+    // 2. "İmzaya Gönder" leaves status in TASLAK_HATA instead of IMZAYA_GONDERILDI.
+    function buildReactPdfContent() {
+      var code = document.getElementById("paramCode").value || "";
+      var type = document.getElementById("paramType").value || "";
+      var val = document.getElementById("paramValue").value || "";
+      var fields = {
+        "Parametre Kodu": code,
+        "Parametre Tipi": type,
+        "Parametre Değeri": val
+        // Missing "Başlangıç Tarihi" & "Açıklama" in React PDF generator!
+      };
+      var container = document.getElementById("pdfFieldsContainer");
+      container.setAttribute("data-pdf-json", JSON.stringify(fields));
+      container.textContent = Object.keys(fields)
+        .map(function (k) { return k + ": " + fields[k]; })
+        .join(" | ");
+    }
+    document.getElementById("btnPdf").addEventListener("click", buildReactPdfContent);
+    document.getElementById("btnSendToSign").addEventListener("click", function () {
+      buildReactPdfContent();
+      var st = document.getElementById("workflowStatusText");
+      st.setAttribute("data-ars-workflow-status", "IMZA_SERVISI_EKSIK");
+      st.textContent = "Durum: IMZA_SERVISI_EKSIK (React e-İmza entegrasyonu tamamlanmadı)";
+    });
+    document.getElementById("btnPublish").addEventListener("click", function () {
+      buildReactPdfContent();
+      var st = document.getElementById("workflowStatusText");
+      st.setAttribute("data-ars-workflow-status", "YAYINLANDI");
+      st.textContent = "Durum: YAYINLANDI";
+    });
+    buildReactPdfContent();
+  </script>
 </body>
 </html>
